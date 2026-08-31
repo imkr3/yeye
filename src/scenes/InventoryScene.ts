@@ -4,6 +4,7 @@ import { CONSUMABLE_POOL } from "../data/items/consumables";
 import { RELIC_POOL } from "../data/items/relics";
 import { RARITY_COLOR, type Rarity } from "../systems/GachaSystem";
 import { equipRelic, unequipRelic, RELIC_SLOT_LIMIT } from "../systems/RegressionSystem";
+import { hasConsumableEffect, useConsumable } from "../systems/ConsumableEffects";
 
 const RARITY_ORDER: Rarity[] = ["SSR", "SR", "R", "UC", "C"];
 
@@ -51,14 +52,35 @@ export class InventoryScene extends Phaser.Scene {
       .filter((r): r is { item: (typeof CONSUMABLE_POOL)[number]; count: number } => !!r.item)
       .sort((a, b) => RARITY_ORDER.indexOf(a.item.rarity) - RARITY_ORDER.indexOf(b.item.rarity));
 
+    const wardCharges = getState().wardCharges;
+    if (wardCharges > 0) {
+      this.add.text(x, 96, `액막이 효과 보유: ${wardCharges}회`, {
+        fontFamily: "monospace",
+        fontSize: "10.5px",
+        color: "#8fbfa4",
+      }).setOrigin(0.5);
+    }
+
     rows.forEach((row, i) => {
-      const y = 115 + i * 22;
+      const y = 118 + i * 24;
       this.add.circle(x - 100, y, 4, RARITY_COLOR[row.item.rarity]);
       this.add.text(x - 88, y, `${row.item.name} ${row.count > 1 ? `×${row.count}` : ""}`, {
         fontFamily: "monospace",
         fontSize: "12px",
         color: "#cbbfa5",
       }).setOrigin(0, 0.5);
+
+      if (hasConsumableEffect(row.item.id)) {
+        const useBtn = this.add.text(x + 100, y, "[사용]", {
+          fontFamily: "monospace",
+          fontSize: "11px",
+          color: "#d1616c",
+        }).setOrigin(1, 0.5).setInteractive({ useHandCursor: true });
+        useBtn.on("pointerdown", () => {
+          setState(useConsumable(getState(), row.item.id));
+          this.scene.restart();
+        });
+      }
     });
   }
 

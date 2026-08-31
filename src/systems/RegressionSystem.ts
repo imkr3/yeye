@@ -41,6 +41,8 @@ export interface RegressionState {
   inventory: { consumables: string[]; relics: string[] };
   /** 진열대에 장착한 유물 id. 설계 문서 1.7 — 초반 슬롯은 2칸으로 제한한다. */
   equippedRelics: string[];
+  /** 액막이 부적 등으로 얻은 "다음 죽음 페널티 방지" 횟수. */
+  wardCharges: number;
 }
 
 export const RELIC_SLOT_LIMIT = 2;
@@ -80,7 +82,22 @@ export function createInitialRegressionState(startPoint: SavePoint): RegressionS
     storyFlags: [],
     inventory: { consumables: [], relics: [] },
     equippedRelics: [],
+    wardCharges: 0,
   };
+}
+
+/** 인벤토리에서 소모품 하나를 제거한다 (사용 시 호출). 없으면 아무 일도 일어나지 않는다. */
+export function removeConsumable(state: RegressionState, itemId: string): RegressionState {
+  const idx = state.inventory.consumables.indexOf(itemId);
+  if (idx === -1) return state;
+  const next = [...state.inventory.consumables];
+  next.splice(idx, 1);
+  return { ...state, inventory: { ...state.inventory, consumables: next } };
+}
+
+/** 액막이 부적 사용 시 호출 — 다음 죽음 페널티를 방지할 횟수를 1 더한다. */
+export function addWardCharge(state: RegressionState): RegressionState {
+  return { ...state, wardCharges: state.wardCharges + 1 };
 }
 
 /** 유물을 진열대에 장착한다. 슬롯이 가득 찼거나 이미 장착 중이면 아무 일도 일어나지 않는다. */
@@ -126,8 +143,19 @@ export function addStoryFlag(state: RegressionState, flag: string): RegressionSt
   return { ...state, storyFlags: [...state.storyFlags, flag] };
 }
 
-/** 죽음 발생 시 호출. 세이브 포인트로 되돌리고 페널티 하나를 누적시킨다. */
+/**
+ * 죽음 발생 시 호출. 세이브 포인트로 되돌리고 페널티 하나를 누적시킨다.
+ * 액막이 부적으로 얻은 wardCharges가 있으면, 이번 죽음의 페널티만 막고 하나를 소모한다.
+ */
 export function applyDeath(state: RegressionState): RegressionState {
+  if (state.wardCharges > 0) {
+    return {
+      ...state,
+      runCount: state.runCount + 1,
+      wardCharges: state.wardCharges - 1,
+    };
+  }
+
   const penalty = PENALTY_POOL[Math.floor(Math.random() * PENALTY_POOL.length)];
   return {
     ...state,
