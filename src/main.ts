@@ -6,6 +6,7 @@ import { DialogueScene } from "./scenes/DialogueScene";
 import { EndingScene } from "./scenes/EndingScene";
 import { CombatScene } from "./scenes/CombatScene";
 import { ToastScene } from "./scenes/ToastScene";
+import { GachaScene } from "./scenes/GachaScene";
 
 const config: Phaser.Types.Core.GameConfig = {
   type: Phaser.AUTO,
@@ -23,7 +24,7 @@ const config: Phaser.Types.Core.GameConfig = {
     default: "arcade",
     arcade: { debug: false },
   },
-  scene: [BootScene, RegionScene, StatusOverlayScene, DialogueScene, EndingScene, CombatScene, ToastScene],
+  scene: [BootScene, RegionScene, StatusOverlayScene, DialogueScene, EndingScene, CombatScene, ToastScene, GachaScene],
 };
 
 new Phaser.Game(config);

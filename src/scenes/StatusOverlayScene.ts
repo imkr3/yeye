@@ -9,6 +9,7 @@ import { getState, gameEvents } from "../state/gameState";
 export class StatusOverlayScene extends Phaser.Scene {
   private text!: Phaser.GameObjects.Text;
   private flash!: Phaser.GameObjects.Rectangle;
+  private shopBtn!: Phaser.GameObjects.Text;
 
   constructor() {
     super("StatusOverlayScene");
@@ -26,12 +27,24 @@ export class StatusOverlayScene extends Phaser.Scene {
       wordWrap: { width: 224 },
     });
 
+    this.shopBtn = this.add.text(716, 560, "◆ 상점 [잠김]", {
+      fontFamily: "monospace",
+      fontSize: "13px",
+      color: "#4a4137",
+    });
+
     this.flash = this.add.rectangle(480, 300, 960, 600, 0x7c1f2b, 0).setDepth(100);
 
     gameEvents.on("regression-updated", (state: RegressionState) => this.render(state));
     gameEvents.on("death-flash", () => this.playDeathFlash());
 
     this.render(getState());
+  }
+
+  private openShop() {
+    this.scene.pause("RegionScene");
+    this.scene.launch("GachaScene");
+    this.scene.get("GachaScene").events.once("shutdown", () => this.scene.resume("RegionScene"));
   }
 
   private render(state: RegressionState) {
@@ -60,6 +73,14 @@ export class StatusOverlayScene extends Phaser.Scene {
         `파편(POINT): ${state.fragments}`,
       ].join("\n")
     );
+
+    const unlocked = state.achievements.length >= 1;
+    this.shopBtn.setText(unlocked ? "◆ 상점" : "◆ 상점 [잠김]");
+    this.shopBtn.setColor(unlocked ? "#a8873a" : "#4a4137");
+    if (unlocked && !this.shopBtn.input) {
+      this.shopBtn.setInteractive({ useHandCursor: true });
+      this.shopBtn.on("pointerdown", () => this.openShop());
+    }
   }
 
   private playDeathFlash() {

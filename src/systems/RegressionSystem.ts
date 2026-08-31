@@ -37,6 +37,8 @@ export interface RegressionState {
   npcTrust: Record<string, number>;
   /** 엔딩 판정에 쓰이는 스토리 플래그 (예: "ally-helga", "abandon-vow" 등) */
   storyFlags: string[];
+  /** 가챠로 뽑은 소모품/유물 id 목록. 소모품은 중복 보유 가능, 유물은 진열대 슬롯 제한이 따로 있다. */
+  inventory: { consumables: string[]; relics: string[] };
 }
 
 // 죽음 페널티 예시 풀 — 설계 문서 1.3의 "경미" 등급 예시.
@@ -72,6 +74,23 @@ export function createInitialRegressionState(startPoint: SavePoint): RegressionS
     fragments: 0,
     npcTrust: {},
     storyFlags: [],
+    inventory: { consumables: [], relics: [] },
+  };
+}
+
+/** 가챠로 소모품을 얻었을 때 인벤토리에 추가한다. */
+export function addConsumable(state: RegressionState, itemId: string): RegressionState {
+  return {
+    ...state,
+    inventory: { ...state.inventory, consumables: [...state.inventory.consumables, itemId] },
+  };
+}
+
+/** 가챠로 유물을 얻었을 때 인벤토리에 추가한다. */
+export function addRelic(state: RegressionState, itemId: string): RegressionState {
+  return {
+    ...state,
+    inventory: { ...state.inventory, relics: [...state.inventory.relics, itemId] },
   };
 }
 
