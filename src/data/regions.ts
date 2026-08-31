@@ -49,6 +49,8 @@ export interface RegionConfig {
   sideExit?: { x: number; y: number; toRegionKey: string; label: string };
   /** 균열 진입구 — 닿으면 RiftScene으로 들어간다. */
   riftEntrance?: { x: number; y: number; label: string };
+  /** 환로 — 여진화로 뽑기와 교환을 하는 자리. */
+  exchangePost?: { x: number; y: number; label: string };
 }
 
 export const REGIONS: Record<string, RegionConfig> = {
@@ -81,6 +83,7 @@ export const REGIONS: Record<string, RegionConfig> = {
     nextRegionKey: "frost-observatory",
     sideExit: { x: 480, y: 550, toRegionKey: "endless-stairs", label: "곁길: 끝없는 계단" },
     riftEntrance: { x: 800, y: 470, label: "균열: 유리맥의 지하도" },
+    exchangePost: { x: 560, y: 180, label: "환로" },
   },
 
   // 반복 방문하는 파밍 루프 던전 — 방 하나짜리 탑다운, 아이작류 구조에 가깝다.

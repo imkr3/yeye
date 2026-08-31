@@ -40,6 +40,7 @@ export class RegionScene extends Phaser.Scene {
   private dialogueOpen = false;
   private facing: 1 | -1 = 1;
   private enteringRift = false;
+  private exchangeOpen = false;
 
   constructor() {
     super("RegionScene");
@@ -51,6 +52,7 @@ export class RegionScene extends Phaser.Scene {
     this.dialogueOpen = false;
     this.facing = 1;
     this.enteringRift = false;
+    this.exchangeOpen = false;
   }
 
   create() {
@@ -181,6 +183,41 @@ export class RegionScene extends Phaser.Scene {
         this.enteringRift = true;
         flushSave();
         this.scene.start("RiftScene");
+      });
+    }
+
+    if (this.config.exchangePost) {
+      const ep = this.config.exchangePost;
+      // 환로 — 반쯤 묻힌 교환 장치
+      const post = this.add.graphics().setDepth(2);
+      for (let i = 5; i >= 1; i--) {
+        post.fillStyle(0xd8a24a, 0.05 * i);
+        post.fillCircle(ep.x, ep.y, 14 * i);
+      }
+      post.fillGradientStyle(0x6b5533, 0x4a3a22, 0x281e12, 0x160f09, 1);
+      post.fillRoundedRect(ep.x - 26, ep.y - 34, 52, 68, 5);
+      post.fillStyle(0xffe7a8, 0.9);
+      post.fillCircle(ep.x, ep.y - 10, 7);
+      post.fillStyle(0x000000, 0.35);
+      post.fillEllipse(ep.x, ep.y + 40, 70, 14);
+      this.tweens.add({ targets: post, alpha: 0.8, duration: 1500, yoyo: true, repeat: -1 });
+
+      this.add
+        .text(ep.x, ep.y - 54, ep.label, { fontSize: "11px", color: "#e0b264" })
+        .setOrigin(0.5)
+        .setDepth(6);
+
+      const zone = this.add.rectangle(ep.x, ep.y, 70, 80, 0x000000, 0);
+      this.physics.add.existing(zone, true);
+      this.physics.add.overlap(this.player, zone as unknown as Phaser.GameObjects.GameObject, () => {
+        if (this.exchangeOpen) return;
+        this.exchangeOpen = true;
+        this.scene.pause();
+        this.scene.launch("ExchangeScene");
+        this.scene.get("ExchangeScene").events.once("shutdown", () => {
+          this.exchangeOpen = false;
+          this.scene.resume();
+        });
       });
     }
 
