@@ -2,6 +2,7 @@ import type { DialogueTree } from "../systems/DialogueSystem";
 import { israDialogue } from "./dialogues/isra";
 import { rivDialogue } from "./dialogues/riv";
 import { helgaDialogue } from "./dialogues/helga";
+import { morenDialogue } from "./dialogues/moren";
 
 export interface RegionNpcConfig {
   id: string;
@@ -22,6 +23,8 @@ export interface RegionConfig {
   npcs: RegionNpcConfig[];
   /** 분기점 도달 후 열리는 다음 지역. 없으면 이 지역이 이야기의 종착점. */
   nextRegionKey?: string;
+  /** 분기점과 무관하게 항상 오갈 수 있는 곁가지 통로 (파밍 루프 연결용). */
+  sideExit?: { x: number; y: number; toRegionKey: string; label: string };
 }
 
 export const REGIONS: Record<string, RegionConfig> = {
@@ -43,6 +46,16 @@ export const REGIONS: Record<string, RegionConfig> = {
     savePoint: { id: "sp-2", x: 700, y: 300, label: "시장 뒷골목 분기점" },
     npcs: [{ id: "riv", label: "리브 칸", x: 320, y: 420, color: 0x3d4a7c, dialogue: rivDialogue }],
     nextRegionKey: "frost-observatory",
+    sideExit: { x: 480, y: 550, toRegionKey: "endless-stairs", label: "곁길: 끝없는 계단" },
+  },
+  "endless-stairs": {
+    key: "endless-stairs",
+    title: "끝없는 계단",
+    backgroundColor: 0x22201e,
+    playerStart: { x: 480, y: 60 },
+    hazard: { x: 480, y: 300, w: 960, h: 30, label: "무너지는 계단참" },
+    npcs: [{ id: "moren", label: "모른", x: 480, y: 480, color: 0x8c8168, dialogue: morenDialogue }],
+    sideExit: { x: 480, y: 560, toRegionKey: "ash-market", label: "재의 시장으로 돌아가기" },
   },
   "frost-observatory": {
     key: "frost-observatory",

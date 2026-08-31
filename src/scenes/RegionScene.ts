@@ -71,6 +71,16 @@ export class RegionScene extends Phaser.Scene {
       }
     }
 
+    if (this.config.sideExit) {
+      const se = this.config.sideExit;
+      const sideExitObj = this.add.rectangle(se.x, se.y, 160, 30, 0x8fbfa4, 0.15);
+      this.physics.add.existing(sideExitObj, true);
+      this.add.text(se.x, se.y - 20, se.label, { fontSize: "11px", color: "#8fbfa4" }).setOrigin(0.5);
+      this.physics.add.overlap(this.player, sideExitObj as unknown as Phaser.GameObjects.GameObject, () => {
+        this.scene.start("RegionScene", { regionKey: se.toRegionKey });
+      });
+    }
+
     this.config.npcs.forEach((npc) => {
       const npcObj = this.add.circle(npc.x, npc.y, 12, npc.color);
       this.add.text(npc.x, npc.y + 20, npc.label, { fontSize: "11px", color: "#cbbfa5" }).setOrigin(0.5);

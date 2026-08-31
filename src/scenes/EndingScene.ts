@@ -28,7 +28,17 @@ export class EndingScene extends Phaser.Scene {
       align: "center",
     }).setOrigin(0.5, 0);
 
-    const restart = this.add.text(480, 400, "[ 처음부터 다시 ]", {
+    if (getState().storyFlags.includes("met-moren")) {
+      this.add.text(480, 350, "— 계단지기 모른만은, 이 결말 바깥에서 여전히 계단을 세고 있다.", {
+        fontFamily: "monospace",
+        fontSize: "12px",
+        color: "#8c8168",
+        wordWrap: { width: 600 },
+        align: "center",
+      }).setOrigin(0.5, 0);
+    }
+
+    const restart = this.add.text(480, 420, "[ 처음부터 다시 ]", {
       fontFamily: "monospace",
       fontSize: "13px",
       color: "#d1616c",
