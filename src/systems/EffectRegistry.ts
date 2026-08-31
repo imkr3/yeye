@@ -35,6 +35,22 @@ export interface RelicModifiers {
   fragmentsOnStain: number;
   /** 전투 시작 시 받는 보호막 */
   startingShield: number;
+  /** 필드 이동 속도 배율 */
+  moveSpeedMultiplier: number;
+  /** 분기점 갱신 시 추가로 얻는 파편 */
+  savePointFragmentBonus: number;
+  /** 전투 시작 시 주어지는 무료 행동 횟수 (적이 반격하지 않는 턴) */
+  freeActions: number;
+  /** 개인 범람 지속 턴 감소 */
+  overflowShorten: number;
+  /** NPC 신뢰 획득 배율 */
+  trustMultiplier: number;
+  /** 트루엔딩 판정에 더해지는 가산점 */
+  endingTrustBonus: number;
+  /** 진열대 추가 슬롯 */
+  relicSlotBonus: number;
+  /** 균열의 방 구성을 미리 보여준다 */
+  revealRooms: boolean;
 }
 
 export const NEUTRAL_MODIFIERS: RelicModifiers = {
@@ -47,6 +63,14 @@ export const NEUTRAL_MODIFIERS: RelicModifiers = {
   trapDamageMultiplier: 1,
   fragmentsOnStain: 0,
   startingShield: 0,
+  moveSpeedMultiplier: 1,
+  savePointFragmentBonus: 0,
+  freeActions: 0,
+  overflowShorten: 0,
+  trustMultiplier: 1,
+  endingTrustBonus: 0,
+  relicSlotBonus: 0,
+  revealRooms: false,
 };
 
 type RelicModifier = (mods: RelicModifiers) => void;
@@ -113,6 +137,66 @@ const RELIC_EFFECTS: Record<string, { note: string; apply: RelicModifier }> = {
       m.memoryFloor = 3;
     },
   },
+  "worn-wristwatch": {
+    note: "이동 속도 15% 증가",
+    apply: (m) => {
+      m.moveSpeedMultiplier *= 1.15;
+    },
+  },
+  "second-save": {
+    note: "분기점 갱신 시 파편 +15",
+    apply: (m) => {
+      m.savePointFragmentBonus += 15;
+    },
+  },
+  "corroded-atlas": {
+    note: "균열의 방 구성을 미리 볼 수 있다",
+    apply: (m) => {
+      m.revealRooms = true;
+    },
+  },
+  "cracked-pocket-watch": {
+    note: "전투 시작 시 반격받지 않는 행동 1회",
+    apply: (m) => {
+      m.freeActions += 1;
+    },
+  },
+  "overflow-condensate": {
+    note: "개인 범람 지속이 1턴 짧아진다",
+    apply: (m) => {
+      m.overflowShorten += 1;
+    },
+  },
+  "morens-old-footprint": {
+    note: "여진화 획득 20% 추가 증가",
+    apply: (m) => {
+      m.coinMultiplier *= 1.2;
+    },
+  },
+  "silent-seal-shard": {
+    note: "NPC 신뢰 획득이 두 배가 된다",
+    apply: (m) => {
+      m.trustMultiplier *= 2;
+    },
+  },
+  "unspoken-name-fragment": {
+    note: "숨겨진 결말 판정에 가산점",
+    apply: (m) => {
+      m.endingTrustBonus += 1;
+    },
+  },
+  "double-vow-seal": {
+    note: "진열대 슬롯 +1",
+    apply: (m) => {
+      m.relicSlotBonus += 1;
+    },
+  },
+  "residue-necklace": {
+    note: "환로 가격 10% 추가 할인",
+    apply: (m) => {
+      m.shopDiscount = Math.min(0.6, m.shopDiscount + 0.1);
+    },
+  },
 };
 
 export function relicHasEffect(itemId: string): boolean {
@@ -137,11 +221,29 @@ export function relicModifiers(equippedRelics: readonly string[]): RelicModifier
 // 소모품 — 사용 시 1회 적용
 // ---------------------------------------------------------------------------
 
+export interface RiftUseContext {
+  /** 남은 방 정보를 드러낸다. */
+  revealRooms?: number;
+  /** 다음 함정에 대한 기억을 임시로 올린다. */
+  trapInsight?: boolean;
+  /** 현재 방을 건너뛴다. */
+  skipRoom?: boolean;
+  /** 심층주로 곧장 간다. */
+  jumpToBoss?: boolean;
+  /** 체력 회복량. */
+  heal?: number;
+  /** 얼룩 변화량. */
+  stain?: number;
+  message: string;
+}
+
 export interface ConsumableDefinition {
   /** 전투 중 사용 가능 여부 */
   combat?: (state: CombatState, mods: RelicModifiers) => string;
   /** 필드(인벤토리)에서 사용 가능 여부 */
   field?: (state: RegressionState) => RegressionState;
+  /** 균열 안에서 사용 가능 여부 — 방 구조에 개입한다 */
+  rift?: () => RiftUseContext;
   note: string;
 }
 
@@ -206,10 +308,74 @@ const CONSUMABLE_EFFECTS: Record<string, ConsumableDefinition> = {
       return "모른의 계단표 — 다음 박자가 전부 적혀 있다.";
     },
   },
+  "damp-matches": {
+    note: "다음 한 수가 잠깐 보인다",
+    combat: (state) => {
+      state.memoryTier = Math.max(state.memoryTier, 1);
+      return "눅눅한 성냥 — 잠깐 불이 붙는다. 그 사이에 상대의 손이 보였다.";
+    },
+  },
+  "ash-bead-necklace": {
+    note: "보호막 6 획득",
+    combat: (state) => {
+      state.player.shield += 6;
+      return "여진 방울 목걸이 — 옅은 빛이 몸을 감싼다.";
+    },
+  },
+  "rewound-hand": {
+    note: "체력을 절반까지 되돌린다",
+    combat: (state) => {
+      const target = Math.round(state.player.maxHp * 0.5);
+      if (state.player.hp >= target) return "되감긴 시침 — 아직 되돌릴 것이 없다.";
+      const healed = target - state.player.hp;
+      state.player.hp = target;
+      return `되감긴 시침 — 시곗바늘이 거꾸로 돈다. 체력 ${healed} 회복.`;
+    },
+  },
+  "vow-ghostwrite": {
+    note: "서약 역류를 가라앉힌다",
+    field: (state) => ({
+      ...state,
+      storyFlags: state.storyFlags.filter((f) => f !== "vow-backlash"),
+    }),
+  },
+  "dull-flint": {
+    note: "균열에서 잠깐 쉬어간다 (체력 12, 얼룩 -4)",
+    rift: () => ({ heal: 12, stain: -4, message: "무딘 부싯돌 — 작은 불을 피워 잠시 숨을 돌린다." }),
+  },
+  "moldy-map-scrap": {
+    note: "균열에서 앞의 방 2개를 드러낸다",
+    rift: () => ({ revealRooms: 2, message: "곰팡이 슨 지도 조각 — 앞쪽 두 칸이 흐릿하게 읽힌다." }),
+  },
+  "helgas-notebook-copy": {
+    note: "균열의 방 구성을 전부 드러낸다",
+    rift: () => ({ revealRooms: 99, message: "헬가의 실험 노트 사본 — 지하도의 구조가 표로 정리되어 있다." }),
+  },
+  "stairkeepers-mark": {
+    note: "다음 함정을 미리 읽는다",
+    rift: () => ({ trapInsight: true, message: "계단지기의 표식 — 다음 함정의 박자가 손끝에 남는다." }),
+  },
+  "translucent-key": {
+    note: "균열의 현재 방을 건너뛴다",
+    rift: () => ({ skipRoom: true, message: "반투명 열쇠 — 없던 문이 열린다. 이 방은 지나간다." }),
+  },
+  "unnamed-invitation": {
+    note: "심층주 앞으로 곧장 간다",
+    rift: () => ({ jumpToBoss: true, message: "이름 없는 자의 초대장 — 길이 접힌다. 최심부가 바로 앞이다." }),
+  },
 };
 
 export function consumableHasCombatUse(itemId: string): boolean {
   return !!CONSUMABLE_EFFECTS[itemId]?.combat;
+}
+
+export function consumableHasRiftUse(itemId: string): boolean {
+  return !!CONSUMABLE_EFFECTS[itemId]?.rift;
+}
+
+/** 균열 안에서의 사용 결과. 아이템 소모는 호출부가 처리한다. */
+export function riftUseEffect(itemId: string): RiftUseContext | null {
+  return CONSUMABLE_EFFECTS[itemId]?.rift?.() ?? null;
 }
 
 export function consumableHasFieldUse(itemId: string): boolean {

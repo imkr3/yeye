@@ -299,7 +299,7 @@ export class RegionScene extends Phaser.Scene {
   }
 
   private updateTopdown(body: Phaser.Physics.Arcade.Body, time: number) {
-    const speed = 200;
+    const speed = 200 * relicModifiers(getState().equippedRelics).moveSpeedMultiplier;
     body.setVelocity(0);
 
     if (this.cursors.left?.isDown) body.setVelocityX(-speed);
@@ -312,7 +312,7 @@ export class RegionScene extends Phaser.Scene {
   }
 
   private updateSidescroll(body: Phaser.Physics.Arcade.Body, time: number) {
-    const speed = 220;
+    const speed = 220 * relicModifiers(getState().equippedRelics).moveSpeedMultiplier;
     body.setVelocityX(0);
 
     if (this.cursors.left?.isDown) {
@@ -371,7 +371,8 @@ export class RegionScene extends Phaser.Scene {
     });
     const achievementId = `reach-${this.config.key}-branch`;
     const isNew = !next.achievements.includes(achievementId);
-    next = grantAchievement(next, achievementId, 30);
+    const bonus = relicModifiers(next.equippedRelics).savePointFragmentBonus;
+    next = grantAchievement(next, achievementId, 30 + bonus);
     setState(next);
     if (isNew) gameEvents.emit("achievement-earned", { label: sp.label });
   }
@@ -466,7 +467,12 @@ export class RegionScene extends Phaser.Scene {
 
     const data: DialogueSceneData = {
       tree: npc.dialogue,
-      onTrustDelta: (npcId, delta) => setState(adjustTrust(getState(), npcId, delta)),
+      onTrustDelta: (npcId, delta) => {
+        // 「침묵의 인장 조각」 같은 유물이 신뢰 획득을 키운다. 감소는 그대로 둔다.
+        const mult = relicModifiers(getState().equippedRelics).trustMultiplier;
+        const scaled = delta > 0 ? Math.round(delta * mult) : delta;
+        setState(adjustTrust(getState(), npcId, scaled));
+      },
       onFlag: (flag) => this.handleDialogueFlag(flag),
       onClose: () => {
         this.dialogueOpen = false;

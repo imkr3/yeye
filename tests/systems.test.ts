@@ -20,6 +20,7 @@ import {
   clearVowBacklash,
   hasVowBacklash,
   RELIC_SLOT_LIMIT,
+  effectiveRelicSlots,
   SAVE_VERSION,
   type RegressionState,
   type SavePoint,
@@ -28,10 +29,24 @@ import { normalizeState, parseSave } from "../src/systems/SaveMigration";
 import { buildRiftRun } from "../src/systems/RiftSystem";
 import { createRng } from "../src/systems/Rng";
 import { stainTier, stainStatus, addStain, STAIN_THRESHOLDS } from "../src/systems/StainSystem";
-import { createCombat, takeTurn, plannedEnemyAction, canUseLastDitch } from "../src/systems/CombatSystem";
-import { relicModifiers, NEUTRAL_MODIFIERS, applyFieldConsumable } from "../src/systems/EffectRegistry";
+import {
+  createCombat,
+  takeTurn,
+  plannedEnemyAction,
+  canUseLastDitch,
+  forecastEnemyActions,
+  describeForecast,
+} from "../src/systems/CombatSystem";
+import {
+  relicModifiers,
+  NEUTRAL_MODIFIERS,
+  applyFieldConsumable,
+  consumableHasRiftUse,
+  riftUseEffect,
+} from "../src/systems/EffectRegistry";
+import { resolveEnding } from "../src/systems/EndingSystem";
 import { pullOnce, pullFive, PITY_THRESHOLD, DUPLICATE_DUST, rarityOdds } from "../src/systems/EconomySystem";
-import { PULSE_COUNTER, GLASS_MITE, SUTURED_PILGRIM } from "../src/data/rifts/enemies";
+import { PULSE_COUNTER, GLASS_MITE, SUTURED_PILGRIM, BACKFLOW_HOUND } from "../src/data/rifts/enemies";
 import { RELIC_POOL } from "../src/data/items/relics";
 
 let passed = 0;
@@ -334,6 +349,89 @@ check("역류가 즉사를 일으키지 않는다", backlashed.runCount === vow.
 const cycled = beginNewCycle(fresh());
 check("새 주기는 시드를 갱신한다", cycled.runSeed !== fresh().runSeed || cycled.cycleId === 2);
 check("새 주기 번호가 오른다", cycled.cycleId === 2);
+
+// ---------------------------------------------------------------------------
+section("13. v0.4 추가 효과");
+
+// 진열대 슬롯을 늘려주는 유물
+let slotState = fresh();
+slotState = {
+  ...slotState,
+  inventory: { consumables: [], relics: ["double-vow-seal", "moss-ring", "worn-leather-gloves"] },
+};
+slotState = equipRelic(slotState, "double-vow-seal");
+slotState = equipRelic(slotState, "moss-ring");
+slotState = equipRelic(slotState, "worn-leather-gloves");
+check("슬롯 유물이 진열대를 3칸으로 늘린다", slotState.equippedRelics.length === 3, `${slotState.equippedRelics.length}`);
+check("슬롯 계산이 유물 보유 여부를 따른다", effectiveRelicSlots(["double-vow-seal"]) === RELIC_SLOT_LIMIT + 1);
+check("슬롯 유물이 없으면 기본 한도", effectiveRelicSlots(["moss-ring"]) === RELIC_SLOT_LIMIT);
+
+// 슬롯이 늘어난 상태도 저장 정규화를 통과해야 한다
+const slotNormalized = normalizeState(slotState);
+check("확장된 진열대가 저장 정규화를 통과한다", slotNormalized.equippedRelics.length === 3);
+
+// 무료 행동 — 그 턴에는 반격이 없다
+const watchMods = relicModifiers(["cracked-pocket-watch"]);
+check("회중시계가 무료 행동을 준다", watchMods.freeActions === 1);
+const freeCombat = createCombat({
+  enemy: GLASS_MITE,
+  memoryTier: 3,
+  playerMaxHp: 100,
+  playerHp: 100,
+  modifiers: watchMods,
+});
+const afterFree = takeTurn(freeCombat, { id: "basic-strike" }, createRng("free"));
+check("무료 행동 턴에는 피해를 받지 않는다", afterFree.record.damageTaken === 0);
+check("무료 행동은 한 번만 쓰인다", afterFree.player.freeActions === 0);
+const afterFreeUsed = takeTurn(afterFree, { id: "basic-strike" }, createRng("free2"));
+check("무료 행동이 떨어지면 다시 반격을 받는다", afterFreeUsed.record.damageTaken > 0);
+
+// 범람 단축
+const shortenMods = relicModifiers(["overflow-condensate"]);
+let shortOverflow = createCombat({
+  enemy: SUTURED_PILGRIM,
+  memoryTier: 3,
+  stain: 95,
+  playerMaxHp: 300,
+  playerHp: 300,
+  modifiers: shortenMods,
+});
+shortOverflow = takeTurn(shortOverflow, { id: "sunder" }, createRng("shorten"));
+check("응결석이 범람 지속을 줄인다", shortOverflow.player.overflowTurnsLeft === 1, `${shortOverflow.player.overflowTurnsLeft}`);
+
+// 균열 전용 아이템
+check("지도 조각은 균열 전용 사용처를 갖는다", consumableHasRiftUse("moldy-map-scrap"));
+check("액막이 부적은 균열 전용이 아니다", !consumableHasRiftUse("warding-talisman"));
+const mapEffect = riftUseEffect("moldy-map-scrap");
+check("지도 조각이 앞의 방을 드러낸다", (mapEffect?.revealRooms ?? 0) === 2);
+const inviteEffect = riftUseEffect("unnamed-invitation");
+check("초대장은 심층주로 곧장 보낸다", inviteEffect?.jumpToBoss === true);
+
+// 행동 순서 예고
+const forecastCombat = createCombat({ enemy: BACKFLOW_HOUND, memoryTier: 3 });
+const forecast = forecastEnemyActions(forecastCombat, 3);
+check("예고가 요청한 개수만큼 나온다", forecast.length === 3);
+check(
+  "예고가 실제 패턴 순서를 따른다",
+  forecast.map((a) => a.id).join(",") === "scent,circle,backlash",
+  forecast.map((a) => a.id).join(",")
+);
+check("예고는 상태를 바꾸지 않는다", forecastCombat.enemy.patternIndex === 0);
+check("기억 0단계에서는 예고가 가려진다", describeForecast(createCombat({ enemy: BACKFLOW_HOUND, memoryTier: 0 }), forecast[0], true) === "?");
+check("기억 3단계에서는 이름이 드러난다", describeForecast(forecastCombat, forecast[0], true) === forecast[0].label);
+
+// 엔딩 가산점
+let endingState = fresh();
+endingState = {
+  ...endingState,
+  npcTrust: { isra: 1, riv: 0 },
+  storyFlags: ["ally-helga"],
+  inventory: { consumables: [], relics: ["unspoken-name-fragment"] },
+};
+const withoutRelic = resolveEnding(endingState);
+const withRelic = resolveEnding({ ...endingState, equippedRelics: ["unspoken-name-fragment"] });
+check("가산점 없이는 트루엔딩에 못 닿는다", withoutRelic.id !== "unspoken-name");
+check("가산 유물이 트루엔딩 판정을 밀어준다", withRelic.id === "unspoken-name");
 
 // ---------------------------------------------------------------------------
 console.log(`\n${passed}개 통과, ${failed}개 실패`);

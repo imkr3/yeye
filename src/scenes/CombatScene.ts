@@ -5,6 +5,9 @@ import {
   takeTurn,
   canUseLastDitch,
   describeEnemyIntent,
+  describeForecast,
+  forecastEnemyActions,
+  forecastIsUncertain,
   type CombatState,
   type PlayerAction,
 } from "../systems/CombatSystem";
@@ -54,6 +57,8 @@ export class CombatScene extends Phaser.Scene {
   private playerFigure!: Phaser.GameObjects.Container;
   private enemyBar!: Phaser.GameObjects.Graphics;
   private playerBar!: Phaser.GameObjects.Graphics;
+  private timelineGraphics!: Phaser.GameObjects.Graphics;
+  private timelineTexts: Phaser.GameObjects.Text[] = [];
   private intentText!: Phaser.GameObjects.Text;
   private memoryText!: Phaser.GameObjects.Text;
   private logText!: Phaser.GameObjects.Text;
@@ -110,9 +115,10 @@ export class CombatScene extends Phaser.Scene {
     this.paintFrames();
     this.enemyBar = this.add.graphics().setDepth(6);
     this.playerBar = this.add.graphics().setDepth(6);
+    this.timelineGraphics = this.add.graphics().setDepth(6);
 
     this.intentText = this.add
-      .text(352, 118, "", {
+      .text(352, 112, "", {
         fontFamily: "serif",
         fontSize: "15px",
         color: "#f0e6d0",
@@ -189,6 +195,8 @@ export class CombatScene extends Phaser.Scene {
     const panel = this.add.graphics().setDepth(5);
     // 상단 적 정보 패널
     this.roundedPanel(panel, 340, 40, 590, 108);
+    // 행동 순서 패널
+    this.roundedPanel(panel, 340, 158, 590, 116);
     // 로그 패널
     this.roundedPanel(panel, 340, 288, 590, 190);
     // 좌측 플레이어 패널
@@ -202,6 +210,10 @@ export class CombatScene extends Phaser.Scene {
         fontSize: "19px",
         color: "#f3e7c8",
       })
+      .setDepth(7);
+
+    this.add
+      .text(352, 168, "행동 순서", { fontFamily: "monospace", fontSize: "10px", color: "#6b6255" })
       .setDepth(7);
 
     this.add
@@ -303,11 +315,164 @@ export class CombatScene extends Phaser.Scene {
       color: "#6b6255",
     });
 
+    this.renderTimeline();
     this.memoryText.setText(`죽음의 기억 ${c.memoryTier}/3`);
     this.intentText.setText(c.over ? "" : describeEnemyIntent(c));
-    this.logText.setText(c.log.slice(-9).join("\n"));
+    this.logText.setText(c.log.slice(-8).join("\n"));
 
     this.renderMenu();
+  }
+
+  /**
+   * 이번 턴의 순서와 앞으로의 적 행동 예고.
+   * 예고의 정확도는 죽음의 기억 단계를 따른다 — 0단계에서는 아무것도 읽히지 않는다.
+   */
+  private renderTimeline() {
+    const c = this.combat;
+    this.timelineGraphics.clear();
+    this.timelineTexts.forEach((t) => t.destroy());
+    this.timelineTexts = [];
+
+    if (c.over) return;
+
+    const order = this.add
+      .text(352, 188, "이번 턴:  나  →  적", {
+        fontFamily: "monospace",
+        fontSize: "12px",
+        color: "#cbbfa5",
+      })
+      .setDepth(7);
+    this.timelineTexts.push(order);
+
+    const forecast = forecastEnemyActions(c, 4);
+    const startX = 356;
+    const chipW = 132;
+
+    forecast.forEach((action, i) => {
+      const x = startX + i * (chipW + 8);
+      const y = 212;
+      const isNext = i === 0;
+      const color = this.kindColor(action.kind);
+      const readable = c.memoryTier >= (isNext ? 1 : 2);
+
+      this.timelineGraphics.fillStyle(readable ? color : 0x2a2536, isNext ? 0.34 : 0.18);
+      this.timelineGraphics.fillRoundedRect(x, y, chipW, 44, 5);
+      this.timelineGraphics.lineStyle(isNext ? 2 : 1, readable ? color : 0x3a3348, isNext ? 0.95 : 0.6);
+      this.timelineGraphics.strokeRoundedRect(x, y, chipW, 44, 5);
+
+      // 계열을 색만이 아니라 왼쪽 표시자의 모양으로도 구분한다
+      if (readable) {
+        this.drawKindGlyph(this.timelineGraphics, x + 16, y + 22, action.kind, color);
+      }
+
+      const label = this.add
+        .text(x + 30, y + 8, describeForecast(c, action, isNext), {
+          fontFamily: "monospace",
+          fontSize: "11px",
+          color: readable ? "#f0e6d0" : "#5c5568",
+          wordWrap: { width: chipW - 38 },
+        })
+        .setDepth(7);
+      this.timelineTexts.push(label);
+
+      const turnLabel = this.add
+        .text(x + chipW - 8, y + 30, isNext ? "다음" : `+${i}`, {
+          fontFamily: "monospace",
+          fontSize: "9px",
+          color: "#6b6255",
+        })
+        .setOrigin(1, 0)
+        .setDepth(7);
+      this.timelineTexts.push(turnLabel);
+    });
+
+    if (forecastIsUncertain(c)) {
+      const warn = this.add
+        .text(352, 258, "2페이즈 — 지나간 박자를 되짚는다. 예고가 확정적이지 않다.", {
+          fontFamily: "monospace",
+          fontSize: "10px",
+          color: "#d1616c",
+        })
+        .setDepth(7);
+      this.timelineTexts.push(warn);
+    } else if (c.memoryTier === 0) {
+      const hint = this.add
+        .text(352, 258, "이 상대는 처음이다. 한 번 겪어봐야 순서가 보인다.", {
+          fontFamily: "monospace",
+          fontSize: "10px",
+          color: "#6b6255",
+        })
+        .setDepth(7);
+      this.timelineTexts.push(hint);
+    }
+  }
+
+  private kindColor(kind: string): number {
+    switch (kind) {
+      case "strong":
+        return 0xd1616c;
+      case "detonate":
+        return 0xe08a4a;
+      case "guardbreak":
+        return 0xa98cf0;
+      case "mark":
+        return 0x8fc4e8;
+      case "recover":
+        return 0x6ea78c;
+      default:
+        return 0xa8a08c;
+    }
+  }
+
+  /** 계열별 기호 — 색각 차이가 있어도 형태로 구분되게 한다. */
+  private drawKindGlyph(g: Phaser.GameObjects.Graphics, x: number, y: number, kind: string, color: number) {
+    g.fillStyle(color, 1);
+    g.lineStyle(1.6, color, 1);
+    switch (kind) {
+      case "strong": // 채워진 삼각형
+        g.beginPath();
+        g.moveTo(x, y - 7);
+        g.lineTo(x + 6, y + 5);
+        g.lineTo(x - 6, y + 5);
+        g.closePath();
+        g.fillPath();
+        break;
+      case "detonate": // 방사형
+        for (let i = 0; i < 6; i++) {
+          const a = (Math.PI / 3) * i;
+          g.beginPath();
+          g.moveTo(x, y);
+          g.lineTo(x + Math.cos(a) * 7, y + Math.sin(a) * 7);
+          g.strokePath();
+        }
+        break;
+      case "guardbreak": // 갈라진 사각
+        g.strokeRect(x - 6, y - 6, 12, 12);
+        g.beginPath();
+        g.moveTo(x - 7, y + 6);
+        g.lineTo(x + 7, y - 6);
+        g.strokePath();
+        break;
+      case "mark": // 빈 마름모
+        g.beginPath();
+        g.moveTo(x, y - 7);
+        g.lineTo(x + 6, y);
+        g.lineTo(x, y + 7);
+        g.lineTo(x - 6, y);
+        g.closePath();
+        g.strokePath();
+        break;
+      case "recover": // 십자
+        g.beginPath();
+        g.moveTo(x - 6, y);
+        g.lineTo(x + 6, y);
+        g.moveTo(x, y - 6);
+        g.lineTo(x, y + 6);
+        g.strokePath();
+        break;
+      default: // 약공격 — 작은 원
+        g.fillCircle(x, y, 4);
+    }
   }
 
   private textCache = new Map<string, Phaser.GameObjects.Text>();

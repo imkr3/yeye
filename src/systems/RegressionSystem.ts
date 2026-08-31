@@ -90,6 +90,21 @@ export const DEFAULT_CARRIED_SLOTS = 3;
 
 export const RELIC_SLOT_LIMIT = 2;
 
+/**
+ * 슬롯을 늘려주는 유물. EffectRegistry를 참조하면 순환 의존이 되므로,
+ * 슬롯 규칙만은 상태 계층에서 직접 안다.
+ */
+export const SLOT_BONUS_RELICS: Record<string, number> = {
+  "double-vow-seal": 1,
+};
+
+export function effectiveRelicSlots(equipped: readonly string[]): number {
+  return (
+    RELIC_SLOT_LIMIT +
+    [...new Set(equipped)].reduce((sum, id) => sum + (SLOT_BONUS_RELICS[id] ?? 0), 0)
+  );
+}
+
 // 죽음 페널티 예시 풀 — 설계 문서 1.3의 "경미" 등급 예시.
 // 전투 불능급으로 세지 않고, 불편하고 성가신 방향으로만 설계한다.
 const PENALTY_POOL: DeathPenalty[] = [
@@ -266,7 +281,9 @@ export function addWardCharge(state: RegressionState): RegressionState {
 /** 유물을 진열대에 장착한다. 슬롯이 가득 찼거나 이미 장착 중이면 아무 일도 일어나지 않는다. */
 export function equipRelic(state: RegressionState, itemId: string): RegressionState {
   if (state.equippedRelics.includes(itemId)) return state;
-  if (state.equippedRelics.length >= RELIC_SLOT_LIMIT) return state;
+  // 슬롯을 늘려주는 유물이면, 그 유물 자신이 들어갈 자리는 기본 한도로 판단한다.
+  const limit = effectiveRelicSlots([...state.equippedRelics, itemId]);
+  if (state.equippedRelics.length >= limit) return state;
   if (!state.inventory.relics.includes(itemId)) return state;
   return { ...state, equippedRelics: [...state.equippedRelics, itemId] };
 }

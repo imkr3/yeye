@@ -21,7 +21,9 @@ import {
   grantAchievement,
   setStain,
 } from "../systems/RegressionSystem";
-import { relicModifiers } from "../systems/EffectRegistry";
+import { consumableHasRiftUse, relicModifiers, riftUseEffect } from "../systems/EffectRegistry";
+import { CONSUMABLE_POOL } from "../data/items/consumables";
+import { removeConsumable } from "../systems/RegressionSystem";
 import { addStain, stainStatus } from "../systems/StainSystem";
 import { createRng } from "../systems/Rng";
 import { PLAYER_BASE } from "../data/combat/balance";
@@ -42,6 +44,10 @@ export class RiftScene extends Phaser.Scene {
   private options: { label: string; act: () => void; disabled?: boolean }[] = [];
   private keyHandler?: (event: KeyboardEvent) => void;
   private busy = false;
+  /** 앞쪽으로 몇 칸까지 방 종류가 드러났는지. */
+  private revealedAhead = 0;
+  /** 다음 함정을 미리 읽는 효과가 걸려 있는지. */
+  private trapInsight = false;
 
   constructor() {
     super("RiftScene");
@@ -51,6 +57,9 @@ export class RiftScene extends Phaser.Scene {
     const state = getState();
     this.run = buildRiftRun(state.runSeed, PLAYER_BASE.maxHp);
     this.busy = false;
+    // 「부식된 지도첩」을 걸어두면 처음부터 전부 드러난다.
+    this.revealedAhead = relicModifiers(state.equippedRelics).revealRooms ? 99 : 0;
+    this.trapInsight = false;
   }
 
   create() {
@@ -125,7 +134,7 @@ export class RiftScene extends Phaser.Scene {
 
     // 함정 방에서는 기억 단계에 따라 힌트가 열린다.
     if (room.trap) {
-      const tier = deathMemoryTier(state, room.trap.id);
+      const tier = Math.max(deathMemoryTier(state, room.trap.id), this.trapInsight ? 2 : 0);
       const hint =
         tier === 0
           ? "이 함정은 처음이다. 무엇이 어떻게 오는지 모른다."
@@ -209,6 +218,23 @@ export class RiftScene extends Phaser.Scene {
       })
       .setDepth(31);
     this.nodes.push(pct);
+
+    // 드러난 앞쪽 방 종류 — 지도 아이템이나 유물이 있을 때만 보인다.
+    if (this.revealedAhead > 0) {
+      const ahead = this.run.rooms
+        .slice(this.run.index + 1, this.run.index + 1 + this.revealedAhead)
+        .map((r) => this.roomKindText(r).split(" — ")[0]);
+      if (ahead.length > 0) {
+        const preview = this.add
+          .text(320, 134, `앞으로: ${ahead.join("  →  ")}`, {
+            fontFamily: "monospace",
+            fontSize: "10px",
+            color: "#8fbfa4",
+          })
+          .setDepth(31);
+        this.nodes.push(preview);
+      }
+    }
   }
 
   private renderRoomOptions(room: RiftRoomDef) {
@@ -229,6 +255,9 @@ export class RiftScene extends Phaser.Scene {
       });
     }
 
+    if (this.usableRiftItems().length > 0) {
+      opts.push({ label: "가방 아이템 사용", act: () => this.openItemMenu() });
+    }
     opts.push({ label: "균열에서 나간다", act: () => this.leaveRift() });
     this.options = opts;
 
@@ -317,7 +346,9 @@ export class RiftScene extends Phaser.Scene {
     // 첫 번째 선택지가 "제대로 된 대응"이다. 기억이 있으면 확실히 성공하고,
     // 없으면 반반이다 — 죽어봐야 아는 것이 이 게임의 핵심이다.
     const isCorrectChoice = (room.choices ?? [])[0]?.id === choice.id;
-    const dodged = isCorrectChoice && (tier >= 1 || rng.chance(0.5));
+    const insight = this.trapInsight;
+    const dodged = isCorrectChoice && (tier >= 1 || insight || rng.chance(0.5));
+    this.trapInsight = false; // 통찰은 한 번 쓰면 사라진다
 
     if (dodged) {
       this.showResolution(trap.dodgeText, () => {
@@ -453,6 +484,85 @@ export class RiftScene extends Phaser.Scene {
 
     this.scene.pause();
     this.scene.launch("CombatScene", data);
+  }
+
+  // --- 가방 아이템 --------------------------------------------------------
+
+  private usableRiftItems() {
+    return [...new Set(getState().carriedItemIds)]
+      .filter((id) => consumableHasRiftUse(id))
+      .map((id) => CONSUMABLE_POOL.find((c) => c.id === id))
+      .filter((c): c is (typeof CONSUMABLE_POOL)[number] => !!c);
+  }
+
+  private openItemMenu() {
+    const items = this.usableRiftItems();
+    this.clearNodes();
+
+    this.renderStatusBar(getState().aftershockCoins, getState().aftershockDust, getState().stain);
+    this.renderProgress();
+
+    this.panel(300, 150, 620, 380);
+    const heading = this.add
+      .text(322, 168, "가방에서 무엇을 쓸까", { fontFamily: "serif", fontSize: "20px", color: "#e6dcff" })
+      .setDepth(31);
+    this.nodes.push(heading);
+
+    const opts: { label: string; act: () => void }[] = items.map((item) => ({
+      label: `${item.name} — ${item.effect}`,
+      act: () => this.useRiftItem(item.id),
+    }));
+    opts.push({ label: "그만둔다", act: () => this.renderRoom() });
+
+    opts.forEach((opt, i) => {
+      const node = this.add
+        .text(322, 210 + i * 34, `[${i + 1}] ${opt.label}`, {
+          fontFamily: "serif",
+          fontSize: "14px",
+          color: "#e8dcc4",
+          wordWrap: { width: 570 },
+        })
+        .setDepth(31)
+        .setInteractive({ useHandCursor: true });
+      node.on("pointerdown", opt.act);
+      node.on("pointerover", () => node.setColor("#ffd9a0"));
+      node.on("pointerout", () => node.setColor("#e8dcc4"));
+      this.nodes.push(node);
+    });
+
+    this.options = opts;
+  }
+
+  private useRiftItem(itemId: string) {
+    const effect = riftUseEffect(itemId);
+    if (!effect) return;
+
+    // 가방과 인벤토리 양쪽에서 소모한다.
+    let state = removeConsumable(getState(), itemId);
+    const carried = [...state.carriedItemIds];
+    const idx = carried.indexOf(itemId);
+    if (idx !== -1) carried.splice(idx, 1);
+    state = { ...state, carriedItemIds: carried };
+
+    if (effect.stain) state = setStain(state, addStain(state.stain, effect.stain));
+    setState(state);
+
+    if (effect.heal) this.run = healRun(this.run, effect.heal);
+    if (effect.revealRooms) this.revealedAhead = Math.max(this.revealedAhead, effect.revealRooms);
+    if (effect.trapInsight) this.trapInsight = true;
+
+    if (effect.jumpToBoss) {
+      this.run = { ...this.run, index: this.run.rooms.length - 1 };
+      this.showResolution(effect.message, () => this.renderRoom());
+      return;
+    }
+    if (effect.skipRoom) {
+      this.run = advanceRoom(this.run);
+      this.showResolution(effect.message, () => this.renderRoom());
+      return;
+    }
+
+    this.showResolution(effect.message, () => this.renderRoom());
   }
 
   // --- 종료 ---------------------------------------------------------------

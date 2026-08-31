@@ -1,4 +1,5 @@
 import type { RegressionState } from "./RegressionSystem";
+import { relicModifiers } from "./EffectRegistry";
 
 /**
  * 엔딩 판정 — 설계 문서 10번 섹션의 분기 흐름을 그대로 코드로 옮긴 것.
@@ -37,7 +38,10 @@ const ENDINGS: Record<EndingId, EndingResult> = {
 };
 
 export function resolveEnding(state: RegressionState): EndingResult {
-  const trustsAtLeast = (npcId: string, threshold: number) => (state.npcTrust[npcId] ?? 0) >= threshold;
+  // 「말하지 않은 이름의 조각」 같은 유물이 판정을 조금 밀어준다.
+  const bonus = relicModifiers(state.equippedRelics).endingTrustBonus;
+  const trustsAtLeast = (npcId: string, threshold: number) =>
+    (state.npcTrust[npcId] ?? 0) + bonus >= threshold;
 
   const trueEndingReady =
     trustsAtLeast("isra", 1) && trustsAtLeast("riv", 1) && state.storyFlags.includes("ally-helga");

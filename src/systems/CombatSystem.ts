@@ -37,6 +37,8 @@ export interface CombatPlayerState {
   overflowTurnsLeft: number;
   /** 피해를 먼저 흡수하는 보호막. */
   shield: number;
+  /** 남은 무료 행동 — 이 턴에는 적이 반격하지 않는다. */
+  freeActions: number;
   /** 이번 턴에 지목해 둔 적 행동 계열. */
   predictedKind: ActionKind | null;
 }
@@ -100,6 +102,7 @@ export function createCombat(setup: CombatSetup): CombatState {
       stain: setup.stain ?? 0,
       overflowTurnsLeft: 0,
       shield: modifiers.startingShield,
+      freeActions: modifiers.freeActions,
       predictedKind: null,
     },
     enemy: {
@@ -136,6 +139,60 @@ export function plannedEnemyAction(state: CombatState, rng?: Rng): EnemyAction {
     if (found) return found;
   }
   return pattern[enemy.patternIndex % pattern.length];
+}
+
+/**
+ * 앞으로의 적 행동을 미리 계산한다 (표시용, 난수 없이 결정적으로).
+ * 실제 진행에 영향을 주지 않으며, UI가 행동 순서를 보여주는 데만 쓴다.
+ */
+export function forecastEnemyActions(state: CombatState, count: number): EnemyAction[] {
+  const pattern = state.enemy.def.pattern;
+  const forecast: EnemyAction[] = [];
+
+  let index = state.enemy.patternIndex;
+  let reverseDue = state.enemy.reverseDue;
+  const history = [...state.enemy.history];
+
+  for (let i = 0; i < count; i++) {
+    let action: EnemyAction;
+
+    if (state.enemy.phase === 2 && reverseDue && history.length >= 2) {
+      // 되풀이 차례 — 직전 두 행동 중 하나. 어느 쪽인지는 확정할 수 없다.
+      const chosenId = history[history.length - 2];
+      action = pattern.find((a) => a.id === chosenId) ?? pattern[index % pattern.length];
+    } else {
+      action = pattern[index % pattern.length];
+      index += 1;
+    }
+
+    if (state.enemy.phase === 2) reverseDue = !reverseDue;
+    history.push(action.id);
+    forecast.push(action);
+  }
+
+  return forecast;
+}
+
+/**
+ * 예고를 기억 단계에 맞춰 문자열로 바꾼다.
+ * 0단계는 아무것도 읽히지 않고, 3단계에서야 정확한 이름이 드러난다.
+ */
+export function describeForecast(state: CombatState, action: EnemyAction, isNext: boolean): string {
+  switch (state.memoryTier) {
+    case 0:
+      return "?";
+    case 1:
+      return isNext ? kindLabel(action.kind) : "?";
+    case 2:
+      return kindLabel(action.kind);
+    default:
+      return action.label;
+  }
+}
+
+/** 페이즈 2의 되풀이 구간은 예고가 확정적이지 않다는 것을 알린다. */
+export function forecastIsUncertain(state: CombatState): boolean {
+  return state.enemy.phase === 2;
 }
 
 /**
@@ -251,16 +308,17 @@ function dealToPlayer(state: CombatState, rawAmount: number, kind: ActionKind) {
   return final;
 }
 
-function applyStain(state: CombatState, delta: number) {
+function applyStain(state: CombatState, delta: number, startedFlag?: { started: boolean }) {
   const before = state.player.stain;
   state.player.stain = addStain(state.player.stain, delta);
   if (state.player.stain > before) {
     state.fragmentsEarned += state.modifiers.fragmentsOnStain;
   }
   if (state.player.stain >= 100 && state.player.overflowTurnsLeft <= 0) {
-    state.player.overflowTurnsLeft = OVERFLOW.durationTurns;
+    state.player.overflowTurnsLeft = Math.max(1, OVERFLOW.durationTurns - state.modifiers.overflowShorten);
     state.overflowResidue = true;
     state.record.overflowTriggered = true;
+    if (startedFlag) startedFlag.started = true;
     pushLog(state, "얼룩이 넘쳤다 — 개인 범람. 잠깐은 강해진다. 대가는 나중에 온다.");
   }
 }
@@ -287,6 +345,9 @@ export function takeTurn(
   next.player.guarding = false;
   next.player.predictedKind = null;
 
+  // 범람이 이번 턴에 막 시작했다면, 지속 턴을 이 턴에 깎지 않는다.
+  const overflow = { started: false };
+
   const plannedBefore = plannedEnemyAction(next, rng);
 
   // --- 1. 플레이어 행동 ---
@@ -310,7 +371,7 @@ export function takeTurn(
     }
     case "causal-mark": {
       next.player.consecutiveGuards = 0;
-      applyStain(next, CAUSAL_MARK.stainCost);
+      applyStain(next, CAUSAL_MARK.stainCost, overflow);
       const predicted = action.predictKind ?? "weak";
       next.player.predictedKind = predicted;
       const hit = plannedBefore.kind === predicted;
@@ -328,7 +389,7 @@ export function takeTurn(
     case "sunder": {
       next.player.consecutiveGuards = 0;
       const dealt = dealToEnemy(next, roll(rng, SUNDER.damage));
-      applyStain(next, SUNDER.stainCost);
+      applyStain(next, SUNDER.stainCost, overflow);
       pushLog(next, `결손 절단 — 방어를 무시하고 ${dealt}의 피해.`);
       if (rng.chance(SUNDER.recoilChance)) {
         const recoil = roll(rng, SUNDER.recoil);
@@ -381,6 +442,14 @@ export function takeTurn(
   }
 
   // --- 2. 적 행동 ---
+  if (next.player.freeActions > 0 && action.id !== "guard") {
+    next.player.freeActions -= 1;
+    pushLog(next, "갈라진 회중시계 — 시간이 한 박자 밀린다. 반격이 오지 않는다.");
+    next.turn += 1;
+    next.record.turns = next.turn;
+    return next;
+  }
+
   const enemyAction = plannedEnemyAction(next, rng);
   next.enemy.history.push(enemyAction.id);
 
@@ -413,7 +482,7 @@ export function takeTurn(
   }
 
   // --- 3. 턴 마무리 ---
-  if (next.player.overflowTurnsLeft > 0) {
+  if (next.player.overflowTurnsLeft > 0 && !overflow.started) {
     next.player.overflowTurnsLeft -= 1;
     if (next.player.overflowTurnsLeft === 0) {
       next.player.stain = OVERFLOW.settleTo;

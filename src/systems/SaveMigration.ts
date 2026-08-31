@@ -1,7 +1,7 @@
 import {
   SAVE_VERSION,
   DEFAULT_CARRIED_SLOTS,
-  RELIC_SLOT_LIMIT,
+  effectiveRelicSlots,
   createInitialRegressionState,
   type RegressionState,
   type SavePoint,
@@ -65,9 +65,8 @@ export function normalizeState(raw: unknown): RegressionState {
   const relics = strArray(inventoryRaw.relics).filter((id) => VALID_RELICS.has(id));
 
   // 장착 유물: 보유 중이며 중복이 없고 슬롯 한도를 넘지 않아야 한다.
-  const equippedRelics = [...new Set(strArray(r.equippedRelics))]
-    .filter((id) => relics.includes(id))
-    .slice(0, RELIC_SLOT_LIMIT);
+  const equippedCandidates = [...new Set(strArray(r.equippedRelics))].filter((id) => relics.includes(id));
+  const equippedRelics = equippedCandidates.slice(0, effectiveRelicSlots(equippedCandidates));
 
   const carriedSlots = Math.max(1, Math.min(8, Math.round(num(r.carriedItemSlots, DEFAULT_CARRIED_SLOTS))));
   const carriedItemIds = strArray(r.carriedItemIds)
