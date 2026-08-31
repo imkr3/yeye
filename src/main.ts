@@ -2,6 +2,7 @@ import Phaser from "phaser";
 import { BootScene } from "./scenes/BootScene";
 import { FieldScene } from "./scenes/FieldScene";
 import { StatusOverlayScene } from "./scenes/StatusOverlayScene";
+import { DialogueScene } from "./scenes/DialogueScene";
 
 const config: Phaser.Types.Core.GameConfig = {
   type: Phaser.AUTO,
@@ -10,6 +11,7 @@ const config: Phaser.Types.Core.GameConfig = {
   height: 600,
   backgroundColor: "#0e0c09",
   pixelArt: true,
+  dom: { createContainer: true }, // 대화 자유 입력용 HTML <input> 사용
   scale: {
     mode: Phaser.Scale.FIT,
     autoCenter: Phaser.Scale.CENTER_BOTH,
@@ -18,7 +20,7 @@ const config: Phaser.Types.Core.GameConfig = {
     default: "arcade",
     arcade: { debug: false },
   },
-  scene: [BootScene, FieldScene, StatusOverlayScene],
+  scene: [BootScene, FieldScene, StatusOverlayScene, DialogueScene],
 };
 
 new Phaser.Game(config);

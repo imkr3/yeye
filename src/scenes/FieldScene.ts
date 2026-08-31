@@ -2,11 +2,14 @@ import Phaser from "phaser";
 import {
   applyDeath,
   advanceSavePoint,
+  adjustTrust,
   createInitialRegressionState,
   grantAchievement,
   type RegressionState,
   type SavePoint,
 } from "../systems/RegressionSystem";
+import { israDialogue } from "../data/dialogues/isra";
+import type { DialogueSceneData } from "./DialogueScene";
 
 /**
  * 침수 회랑 (1단계 버티컬 슬라이스 지역) — 임시 프로토타입 씬.
@@ -53,7 +56,36 @@ export class FieldScene extends Phaser.Scene {
       this.onReachSavePoint();
     });
 
+    // 이스라 NPC — 닿으면 대화 시작
+    const npc = this.add.circle(250, 420, 12, 0x4c6e5c);
+    this.add.text(250, 440, "이스라", { fontSize: "11px", color: "#8fbfa4" }).setOrigin(0.5);
+    this.physics.add.existing(npc, true);
+    this.physics.add.overlap(this.player, npc as unknown as Phaser.GameObjects.GameObject, () => {
+      this.openDialogue();
+    });
+
     this.events.emit("regression-updated", this.regression);
+  }
+
+  private dialogueOpen = false;
+
+  private openDialogue() {
+    if (this.dialogueOpen) return;
+    this.dialogueOpen = true;
+    this.scene.pause();
+
+    const data: DialogueSceneData = {
+      tree: israDialogue,
+      onTrustDelta: (npcId, delta) => {
+        this.regression = adjustTrust(this.regression, npcId, delta);
+        this.events.emit("regression-updated", this.regression);
+      },
+      onClose: () => {
+        this.dialogueOpen = false;
+        this.scene.resume();
+      },
+    };
+    this.scene.launch("DialogueScene", data);
   }
 
   update() {

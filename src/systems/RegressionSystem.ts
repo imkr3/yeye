@@ -33,6 +33,10 @@ export interface RegressionState {
   achievements: string[];
   titles: string[];
   fragments: number; // 파편(POINT)
+  /** NPC별 신뢰도. 대화 시스템(11번 섹션)이 갱신한다. */
+  npcTrust: Record<string, number>;
+  /** 엔딩 판정에 쓰이는 스토리 플래그 (예: "ally-helga", "abandon-vow" 등) */
+  storyFlags: string[];
 }
 
 // 죽음 페널티 예시 풀 — 설계 문서 1.3의 "경미" 등급 예시.
@@ -66,7 +70,24 @@ export function createInitialRegressionState(startPoint: SavePoint): RegressionS
     achievements: [],
     titles: [],
     fragments: 0,
+    npcTrust: {},
+    storyFlags: [],
   };
+}
+
+/** 대화 시스템이 신뢰도를 갱신할 때 사용. */
+export function adjustTrust(state: RegressionState, npcId: string, delta: number): RegressionState {
+  if (!delta) return state;
+  const current = state.npcTrust[npcId] ?? 0;
+  return {
+    ...state,
+    npcTrust: { ...state.npcTrust, [npcId]: current + delta },
+  };
+}
+
+export function addStoryFlag(state: RegressionState, flag: string): RegressionState {
+  if (state.storyFlags.includes(flag)) return state;
+  return { ...state, storyFlags: [...state.storyFlags, flag] };
 }
 
 /** 죽음 발생 시 호출. 세이브 포인트로 되돌리고 페널티 하나를 누적시킨다. */

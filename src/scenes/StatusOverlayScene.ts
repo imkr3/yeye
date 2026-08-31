@@ -50,6 +50,11 @@ export class StatusOverlayScene extends Phaser.Scene {
         "누적 페널티:",
         penalties,
         "",
+        "NPC 신뢰:",
+        Object.keys(state.npcTrust).length
+          ? Object.entries(state.npcTrust).map(([id, v]) => `- ${id}: ${v > 0 ? "+" : ""}${v}`).join("\n")
+          : "없음",
+        "",
         `파편(POINT): ${state.fragments}`,
       ].join("\n")
     );
