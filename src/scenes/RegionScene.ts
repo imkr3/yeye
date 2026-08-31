@@ -1,6 +1,6 @@
 import Phaser from "phaser";
 import { REGIONS, type RegionConfig, type RegionNpcConfig } from "../data/regions";
-import { getState, setState, gameEvents } from "../state/gameState";
+import { getState, setState, gameEvents, flushSave } from "../state/gameState";
 import {
   applyDeath,
   advanceSavePoint,
@@ -39,6 +39,7 @@ export class RegionScene extends Phaser.Scene {
   private hazardTriggered = false;
   private dialogueOpen = false;
   private facing: 1 | -1 = 1;
+  private enteringRift = false;
 
   constructor() {
     super("RegionScene");
@@ -49,6 +50,7 @@ export class RegionScene extends Phaser.Scene {
     this.hazardTriggered = false;
     this.dialogueOpen = false;
     this.facing = 1;
+    this.enteringRift = false;
   }
 
   create() {
@@ -150,6 +152,35 @@ export class RegionScene extends Phaser.Scene {
       this.add.text(se.x, se.y - 20, se.label, { fontSize: "11px", color: "#8fbfa4" }).setOrigin(0.5);
       this.physics.add.overlap(this.player, sideExitObj as unknown as Phaser.GameObjects.GameObject, () => {
         this.scene.start("RegionScene", { regionKey: se.toRegionKey });
+      });
+    }
+
+    if (this.config.riftEntrance) {
+      const re = this.config.riftEntrance;
+      // 균열 입구 — 바닥에 뚫린 빛나는 틈
+      const portal = this.add.graphics().setDepth(2);
+      for (let i = 6; i >= 1; i--) {
+        portal.fillStyle(0xa98cf0, 0.05 * i);
+        portal.fillEllipse(re.x, re.y, 34 * i, 12 * i);
+      }
+      portal.fillGradientStyle(0xd8c8ff, 0xa98cf0, 0x40306a, 0x140f26, 1);
+      portal.fillEllipse(re.x, re.y, 96, 34);
+      portal.fillStyle(0x07060d, 0.92);
+      portal.fillEllipse(re.x, re.y + 2, 74, 24);
+      this.tweens.add({ targets: portal, alpha: 0.72, duration: 1600, yoyo: true, repeat: -1 });
+
+      this.add
+        .text(re.x, re.y - 44, re.label, { fontSize: "11px", color: "#c9b0ff" })
+        .setOrigin(0.5)
+        .setDepth(6);
+
+      const zone = this.add.rectangle(re.x, re.y, 96, 40, 0x000000, 0);
+      this.physics.add.existing(zone, true);
+      this.physics.add.overlap(this.player, zone as unknown as Phaser.GameObjects.GameObject, () => {
+        if (this.enteringRift) return;
+        this.enteringRift = true;
+        flushSave();
+        this.scene.start("RiftScene");
       });
     }
 

@@ -47,6 +47,8 @@ export interface RegionConfig {
   nextRegionKey?: string;
   /** 분기점과 무관하게 항상 오갈 수 있는 곁가지 통로 (파밍 루프 연결용). */
   sideExit?: { x: number; y: number; toRegionKey: string; label: string };
+  /** 균열 진입구 — 닿으면 RiftScene으로 들어간다. */
+  riftEntrance?: { x: number; y: number; label: string };
 }
 
 export const REGIONS: Record<string, RegionConfig> = {
@@ -78,6 +80,7 @@ export const REGIONS: Record<string, RegionConfig> = {
     npcs: [{ id: "riv", label: "리브 칸", x: 320, y: 420, color: 0x3d4a7c, shape: "diamond", dialogue: rivDialogue }],
     nextRegionKey: "frost-observatory",
     sideExit: { x: 480, y: 550, toRegionKey: "endless-stairs", label: "곁길: 끝없는 계단" },
+    riftEntrance: { x: 800, y: 470, label: "균열: 유리맥의 지하도" },
   },
 
   // 반복 방문하는 파밍 루프 던전 — 방 하나짜리 탑다운, 아이작류 구조에 가깝다.
