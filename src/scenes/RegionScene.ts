@@ -7,6 +7,7 @@ import {
   adjustTrust,
   addStoryFlag,
   grantAchievement,
+  collectPickup,
 } from "../systems/RegressionSystem";
 import type { DialogueSceneData } from "./DialogueScene";
 import type { CombatSceneData } from "./CombatScene";
@@ -69,6 +70,27 @@ export class RegionScene extends Phaser.Scene {
         return platform;
       });
     }
+
+    (this.config.pickups ?? []).forEach((pickup) => {
+      if (getState().collectedPickups.includes(pickup.id)) return; // 이미 주웠으면 다시 안 뜬다
+
+      const icon = this.add.circle(pickup.x, pickup.y, 6, 0xa8873a, 0.9);
+      icon.setStrokeStyle(1, 0xe8e1cd, 0.8);
+      this.tweens.add({
+        targets: icon,
+        y: pickup.y - 6,
+        duration: 900,
+        yoyo: true,
+        repeat: -1,
+        ease: "Sine.InOut",
+      });
+      this.physics.add.existing(icon, true);
+      this.physics.add.overlap(this.player, icon as unknown as Phaser.GameObjects.GameObject, () => {
+        setState(collectPickup(getState(), pickup.id, pickup.fragmentReward));
+        gameEvents.emit("achievement-earned", { label: `파편 +${pickup.fragmentReward}` });
+        icon.destroy();
+      });
+    });
 
     this.player = drawFieldSilhouette(
       this,

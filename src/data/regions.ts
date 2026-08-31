@@ -29,6 +29,8 @@ export interface RegionConfig {
   groundY?: number;
   /** sidescroll 전용: 점프로 올라설 수 있는 공중 발판. 진행에 필수는 아닌 보조 경로. */
   platforms?: { x: number; y: number; w: number; h: number }[];
+  /** 필드에 놓인 파편 픽업 — 보통 발판 위에 얹어 점프에 목적을 준다. */
+  pickups?: { id: string; x: number; y: number; fragmentReward: number }[];
   playerStart: { x: number; y: number };
   hazard?: {
     x: number;
@@ -59,6 +61,7 @@ export const REGIONS: Record<string, RegionConfig> = {
     playerStart: { x: 80, y: 420 },
     hazard: { x: 950, y: 420, w: 44, h: 140, label: "함정 — 점프로 넘으세요" },
     platforms: [{ x: 650, y: 340, w: 120, h: 16 }],
+    pickups: [{ id: "sunken-corridor-ledge-1", x: 650, y: 310, fragmentReward: 10 }],
     savePoint: { id: "sp-1", x: 2080, y: 420, label: "회랑 안쪽 분기점" },
     npcs: [{ id: "isra", label: "이스라", x: 500, y: 420, color: 0x4c6e5c, shape: "leaf", dialogue: israDialogue }],
     nextRegionKey: "ash-market",
@@ -107,6 +110,10 @@ export const REGIONS: Record<string, RegionConfig> = {
     playerStart: { x: 80, y: 420 },
     hazard: { x: 1000, y: 420, w: 50, h: 150, label: "정면 승부 불가 구간 — 점프로 넘으세요" },
     platforms: [{ x: 700, y: 340, w: 120, h: 16 }, { x: 1350, y: 340, w: 120, h: 16 }],
+    pickups: [
+      { id: "frost-observatory-ledge-1", x: 700, y: 310, fragmentReward: 10 },
+      { id: "frost-observatory-ledge-2", x: 1350, y: 310, fragmentReward: 15 },
+    ],
     npcs: [{ id: "helga", label: "헬가 도른", x: 1750, y: 420, color: 0xa8873a, shape: "triangle", dialogue: helgaDialogue }],
     // nextRegionKey 없음 — 헬가와의 대화가 끝나면 엔딩으로 이어진다.
   },

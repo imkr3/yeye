@@ -43,6 +43,8 @@ export interface RegressionState {
   equippedRelics: string[];
   /** 액막이 부적 등으로 얻은 "다음 죽음 페널티 방지" 횟수. */
   wardCharges: number;
+  /** 필드에서 주운 파편 픽업 id 목록 — 한 번 주우면 다시 못 줍는다. */
+  collectedPickups: string[];
 }
 
 export const RELIC_SLOT_LIMIT = 2;
@@ -83,6 +85,17 @@ export function createInitialRegressionState(startPoint: SavePoint): RegressionS
     inventory: { consumables: [], relics: [] },
     equippedRelics: [],
     wardCharges: 0,
+    collectedPickups: [],
+  };
+}
+
+/** 필드 픽업을 주웠을 때 호출. 이미 주운 픽업이면 아무 일도 일어나지 않는다. */
+export function collectPickup(state: RegressionState, pickupId: string, fragmentReward: number): RegressionState {
+  if (state.collectedPickups.includes(pickupId)) return state;
+  return {
+    ...state,
+    collectedPickups: [...state.collectedPickups, pickupId],
+    fragments: state.fragments + fragmentReward,
   };
 }
 
