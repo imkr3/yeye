@@ -13,9 +13,16 @@ import type { CombatSceneData } from "./CombatScene";
 import { paintRegionBackground, type BackgroundStyle } from "../render/backgrounds";
 import { drawFieldSilhouette, addIdleBreath } from "../render/silhouettes";
 
+const JUMP_VELOCITY = -420;
+const GRAVITY_Y = 900;
+
 /**
  * 지역 하나를 표현하는 재사용 가능한 씬. data/regions.ts의 설정을 읽어
- * 침수 회랑·재의 시장·서리 관측소를 전부 이 하나의 클래스로 그린다.
+ * 침수 회랑·재의 시장·서리 관측소·끝없는 계단을 전부 이 하나의 클래스로 그린다.
+ *
+ * 이동 방식은 지역마다 다르다 (movementMode 참고):
+ * - sidescroll: 함정·전투처럼 선형으로 통과하는 구간. 좌우 이동 + 점프, 카메라가 따라간다.
+ * - topdown: NPC와 되돌아와 상호작용하는 허브/던전 방. 4방향 자유 이동, 카메라 고정.
  */
 export class RegionScene extends Phaser.Scene {
   private config!: RegionConfig;
@@ -23,7 +30,7 @@ export class RegionScene extends Phaser.Scene {
   private cursors!: Phaser.Types.Input.Keyboard.CursorKeys;
   private hazardTriggered = false;
   private dialogueOpen = false;
-  private exitZone?: Phaser.GameObjects.Rectangle;
+  private facing: 1 | -1 = 1;
 
   constructor() {
     super("RegionScene");
@@ -33,11 +40,28 @@ export class RegionScene extends Phaser.Scene {
     this.config = REGIONS[data.regionKey];
     this.hazardTriggered = false;
     this.dialogueOpen = false;
+    this.facing = 1;
   }
 
   create() {
-    paintRegionBackground(this, this.config.key as BackgroundStyle);
-    this.add.text(24, 16, this.config.title, { fontFamily: "serif", fontSize: "16px", color: "#e8e1cd" });
+    const isSidescroll = this.config.movementMode === "sidescroll";
+    const worldWidth = isSidescroll ? this.config.worldWidth ?? 2000 : 960;
+    const groundY = this.config.groundY ?? 420;
+
+    paintRegionBackground(this, this.config.key as BackgroundStyle, worldWidth);
+    this.add.text(24, 16, this.config.title, { fontFamily: "serif", fontSize: "16px", color: "#e8e1cd" }).setScrollFactor(0);
+
+    this.physics.world.setBounds(0, 0, worldWidth, 600);
+    this.cameras.main.setBounds(0, 0, worldWidth, 600);
+
+    if (isSidescroll) {
+      this.physics.world.gravity.y = GRAVITY_Y;
+      // 바닥 — 시각적으로도, 물리적으로도 캐릭터가 서는 기준선.
+      this.add.rectangle(worldWidth / 2, groundY + 22, worldWidth, 44, 0x000000, 0.35);
+      const ground = this.add.rectangle(worldWidth / 2, groundY + 20, worldWidth, 8, 0x000000, 0);
+      this.physics.add.existing(ground, true);
+      this.groundCollider = ground;
+    }
 
     this.player = drawFieldSilhouette(
       this,
@@ -47,8 +71,17 @@ export class RegionScene extends Phaser.Scene {
       "dual-ring"
     );
     this.physics.add.existing(this.player);
-    (this.player.body as Phaser.Physics.Arcade.Body).setCircle(14, -14, -14);
+    const playerBody = this.player.body as Phaser.Physics.Arcade.Body;
+    playerBody.setCircle(14, -14, -14);
+    if (isSidescroll) {
+      playerBody.setCollideWorldBounds(true);
+      if (this.groundCollider) this.physics.add.collider(this.player, this.groundCollider);
+    }
     this.cursors = this.input.keyboard!.createCursorKeys();
+
+    if (isSidescroll) {
+      this.cameras.main.startFollow(this.player, true, 0.12, 0.12);
+    }
 
     if (this.config.hazard) {
       const h = this.config.hazard;
@@ -73,10 +106,12 @@ export class RegionScene extends Phaser.Scene {
       });
 
       if (this.config.nextRegionKey) {
-        this.exitZone = this.add.rectangle(920, 300, 40, 200, 0xe08a92, 0.15);
-        this.physics.add.existing(this.exitZone, true);
-        this.add.text(920, 190, "다음 지역", { fontSize: "11px", color: "#cbbfa5" }).setOrigin(0.5);
-        this.physics.add.overlap(this.player, this.exitZone as unknown as Phaser.GameObjects.GameObject, () => {
+        const exitX = isSidescroll ? worldWidth - 40 : 920;
+        const exitY = isSidescroll ? groundY : 300;
+        const exitZone = this.add.rectangle(exitX, exitY, 40, 200, 0xe08a92, 0.15);
+        this.physics.add.existing(exitZone, true);
+        this.add.text(exitX, exitY - (isSidescroll ? 120 : 110), "다음 지역", { fontSize: "11px", color: "#cbbfa5" }).setOrigin(0.5);
+        this.physics.add.overlap(this.player, exitZone as unknown as Phaser.GameObjects.GameObject, () => {
           this.tryAdvanceRegion();
         });
       }
@@ -103,11 +138,29 @@ export class RegionScene extends Phaser.Scene {
       });
     });
 
+    if (isSidescroll) {
+      this.add.text(24, 580, "← → 이동 · ↑ 점프", { fontSize: "11px", color: "#6b6255" }).setScrollFactor(0);
+    } else {
+      this.add.text(24, 580, "방향키로 이동", { fontSize: "11px", color: "#6b6255" }).setScrollFactor(0);
+    }
+
     gameEvents.emit("regression-updated", getState());
   }
 
+  private groundCollider?: Phaser.GameObjects.Rectangle;
+
   update(time: number) {
+    const isSidescroll = this.config.movementMode === "sidescroll";
     const body = this.player.body as Phaser.Physics.Arcade.Body;
+
+    if (isSidescroll) {
+      this.updateSidescroll(body, time);
+    } else {
+      this.updateTopdown(body, time);
+    }
+  }
+
+  private updateTopdown(body: Phaser.Physics.Arcade.Body, time: number) {
     const speed = 200;
     body.setVelocity(0);
 
@@ -117,6 +170,35 @@ export class RegionScene extends Phaser.Scene {
     if (this.cursors.up?.isDown) body.setVelocityY(-speed);
     else if (this.cursors.down?.isDown) body.setVelocityY(speed);
 
+    this.applyWalkBob(body, time);
+  }
+
+  private updateSidescroll(body: Phaser.Physics.Arcade.Body, time: number) {
+    const speed = 220;
+    body.setVelocityX(0);
+
+    if (this.cursors.left?.isDown) {
+      body.setVelocityX(-speed);
+      this.facing = -1;
+    } else if (this.cursors.right?.isDown) {
+      body.setVelocityX(speed);
+      this.facing = 1;
+    }
+
+    const onGround = body.blocked.down || body.touching.down;
+    if (Phaser.Input.Keyboard.JustDown(this.cursors.up!) && onGround) {
+      body.setVelocityY(JUMP_VELOCITY);
+    }
+
+    const bobScale = onGround ? 1 : 1; // 점프 중엔 걷기 바운스 생략, 착지감은 추후 보강
+    this.player.setScale(this.facing * bobScale, 1);
+    if (onGround && body.velocity.x !== 0) {
+      const bob = Math.sin(time / 80) * 0.05;
+      this.player.setScale(this.facing, 1 + bob);
+    }
+  }
+
+  private applyWalkBob(body: Phaser.Physics.Arcade.Body, time: number) {
     const moving = body.velocity.x !== 0 || body.velocity.y !== 0;
     if (moving) {
       const bob = Math.sin(time / 80) * 0.05;
@@ -133,6 +215,7 @@ export class RegionScene extends Phaser.Scene {
     this.time.delayedCall(400, () => {
       const sp = getState().currentSavePoint;
       this.player.setPosition(sp.x, sp.y);
+      (this.player.body as Phaser.Physics.Arcade.Body).setVelocity(0, 0);
       this.hazardTriggered = false;
     });
   }
@@ -181,6 +264,7 @@ export class RegionScene extends Phaser.Scene {
         if (result === "lose") {
           const sp = getState().currentSavePoint;
           this.player.setPosition(sp.x, sp.y);
+          (this.player.body as Phaser.Physics.Arcade.Body).setVelocity(0, 0);
         }
       },
     };
