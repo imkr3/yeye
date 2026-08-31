@@ -165,7 +165,8 @@ export class CombatScene extends Phaser.Scene {
     floor.fillEllipse(190, 452, 260, 44);
 
     // 떠다니는 재
-    for (let i = 0; i < 26; i++) {
+    const ashCount = getState().settings.accessibility.reduceParticles ? 5 : 26;
+    for (let i = 0; i < ashCount; i++) {
       const x = Phaser.Math.Between(0, 960);
       const y = Phaser.Math.Between(60, 560);
       const dot = this.add.circle(x, y, Phaser.Math.Between(1, 2), 0xc9b0ff, 0.22).setDepth(-7);

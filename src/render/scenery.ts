@@ -1,5 +1,6 @@
 import Phaser from "phaser";
 import { atmospheric, desaturate, lerpColor, shade } from "./colors";
+import { getState } from "../state/gameState";
 
 /**
  * 입체감 있는 지역 배경.
@@ -335,10 +336,12 @@ function paintDepthParticles(
   worldWidth: number,
   groundY: number
 ) {
+  // 접근성 설정 — 파티클 줄이기를 켜면 개수를 크게 낮춘다.
+  const scale = getState().settings.accessibility.reduceParticles ? 0.2 : 1;
   const depths = [
-    { scroll: 0.35, count: 26, size: 1, alpha: 0.22, rise: 26 },
-    { scroll: 0.7, count: 22, size: 1.7, alpha: 0.3, rise: 40 },
-    { scroll: 1.15, count: 14, size: 2.6, alpha: 0.22, rise: 62 },
+    { scroll: 0.35, count: Math.round(26 * scale), size: 1, alpha: 0.22, rise: 26 },
+    { scroll: 0.7, count: Math.round(22 * scale), size: 1.7, alpha: 0.3, rise: 40 },
+    { scroll: 1.15, count: Math.round(14 * scale), size: 2.6, alpha: 0.22, rise: 62 },
   ];
 
   depths.forEach((d) => {
