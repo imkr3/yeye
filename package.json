@@ -1,0 +1,19 @@
+{
+  "name": "unbroken-vow",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "무한 서약 — 회귀형 2D 스토리 RPG (웹 프로토타입)",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc -b && vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "phaser": "^3.80.1"
+  },
+  "devDependencies": {
+    "typescript": "^5.6.2",
+    "vite": "^5.4.10"
+  }
+}
