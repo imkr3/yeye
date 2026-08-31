@@ -9,6 +9,7 @@ import type { DialogueTree } from "../../systems/DialogueSystem";
 export const morenDialogue: DialogueTree = {
   npcId: "moren",
   crestColor: 0x8c8168, // 계통 불명 — 중립 회색
+  crestShape: "zigzag",
   startNode: "greet",
   nodes: {
     greet: {

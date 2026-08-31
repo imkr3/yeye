@@ -8,6 +8,7 @@ import type { DialogueTree } from "../../systems/DialogueSystem";
 export const helgaDialogue: DialogueTree = {
   npcId: "helga",
   crestColor: 0xa8873a, // 성(聖) 계통
+  crestShape: "triangle",
   startNode: "greet",
   nodes: {
     greet: {

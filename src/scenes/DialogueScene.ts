@@ -4,6 +4,7 @@ import {
   evaluateFreeText,
   type DialogueTree,
 } from "../systems/DialogueSystem";
+import { drawCrest } from "../render/silhouettes";
 
 export interface DialogueSceneData {
   tree: DialogueTree;
@@ -35,8 +36,8 @@ export class DialogueScene extends Phaser.Scene {
   create() {
     this.add.rectangle(480, 460, 860, 220, 0x0e0c09, 0.92).setStrokeStyle(1, 0x3a3225);
 
-    // 문장(紋章) — 계통색 원. 08번 섹션 비주얼 디렉션 참고.
-    this.add.circle(64, 386, 8, this.dialogueData.tree.crestColor).setStrokeStyle(1, 0xe8e1cd);
+    // 문장(紋章) — 필드 실루엣과 같은 모양을 재사용해 일관성을 유지한다.
+    drawCrest(this, 56, 386, 14, this.dialogueData.tree.crestColor, this.dialogueData.tree.crestShape);
 
     this.speakerText = this.add.text(80, 380, "", {
       fontFamily: "monospace",

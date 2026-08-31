@@ -7,6 +7,7 @@ import type { DialogueTree } from "../../systems/DialogueSystem";
 export const rivDialogue: DialogueTree = {
   npcId: "riv",
   crestColor: 0x3d4a7c, // 연(緣) 계통
+  crestShape: "diamond",
   startNode: "greet",
   nodes: {
     greet: {

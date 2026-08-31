@@ -45,6 +45,8 @@ export interface DialogueTree {
   npcId: string;
   /** 대화 UI에 표시할 계통색 문장. 비주얼 디렉션(08번 섹션) 팔레트 참고. */
   crestColor: number;
+  /** 문장 모양 — render/silhouettes.ts의 CrestShape과 동일한 값을 문자열로 둔다. */
+  crestShape: "dual-ring" | "leaf" | "diamond" | "triangle" | "zigzag";
   startNode: string;
   nodes: Record<string, DialogueNode>;
 }

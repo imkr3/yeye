@@ -9,6 +9,8 @@ import {
   grantAchievement,
 } from "../systems/RegressionSystem";
 import type { DialogueSceneData } from "./DialogueScene";
+import { paintRegionBackground, type BackgroundStyle } from "../render/backgrounds";
+import { drawFieldSilhouette } from "../render/silhouettes";
 
 /**
  * 지역 하나를 표현하는 재사용 가능한 씬. data/regions.ts의 설정을 읽어
@@ -16,7 +18,7 @@ import type { DialogueSceneData } from "./DialogueScene";
  */
 export class RegionScene extends Phaser.Scene {
   private config!: RegionConfig;
-  private player!: Phaser.GameObjects.Arc;
+  private player!: Phaser.GameObjects.Container;
   private cursors!: Phaser.Types.Input.Keyboard.CursorKeys;
   private hazardTriggered = false;
   private dialogueOpen = false;
@@ -33,11 +35,18 @@ export class RegionScene extends Phaser.Scene {
   }
 
   create() {
-    this.add.rectangle(480, 300, 960, 600, this.config.backgroundColor);
+    paintRegionBackground(this, this.config.key as BackgroundStyle);
     this.add.text(24, 16, this.config.title, { fontFamily: "serif", fontSize: "16px", color: "#e8e1cd" });
 
-    this.player = this.add.circle(this.config.playerStart.x, this.config.playerStart.y, 14, 0xe08a92);
+    this.player = drawFieldSilhouette(
+      this,
+      this.config.playerStart.x,
+      this.config.playerStart.y,
+      0xd1616c,
+      "dual-ring"
+    );
     this.physics.add.existing(this.player);
+    (this.player.body as Phaser.Physics.Arcade.Body).setCircle(14, -14, -20);
     this.cursors = this.input.keyboard!.createCursorKeys();
 
     if (this.config.hazard) {
@@ -82,10 +91,11 @@ export class RegionScene extends Phaser.Scene {
     }
 
     this.config.npcs.forEach((npc) => {
-      const npcObj = this.add.circle(npc.x, npc.y, 12, npc.color);
-      this.add.text(npc.x, npc.y + 20, npc.label, { fontSize: "11px", color: "#cbbfa5" }).setOrigin(0.5);
-      this.physics.add.existing(npcObj, true);
-      this.physics.add.overlap(this.player, npcObj as unknown as Phaser.GameObjects.GameObject, () => {
+      const npcSilhouette = drawFieldSilhouette(this, npc.x, npc.y, npc.color, npc.shape, 12);
+      this.physics.add.existing(npcSilhouette, true);
+      (npcSilhouette.body as Phaser.Physics.Arcade.Body).setCircle(12, -12, -17);
+      this.add.text(npc.x, npc.y + 22, npc.label, { fontSize: "11px", color: "#cbbfa5" }).setOrigin(0.5);
+      this.physics.add.overlap(this.player, npcSilhouette as unknown as Phaser.GameObjects.GameObject, () => {
         this.openDialogue(npc);
       });
     });
