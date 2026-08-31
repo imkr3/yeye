@@ -27,6 +27,8 @@ export interface RegionConfig {
   /** sidescroll 전용: 월드 폭(카메라보다 넓음)과 캐릭터가 서는 바닥 y좌표. */
   worldWidth?: number;
   groundY?: number;
+  /** sidescroll 전용: 점프로 올라설 수 있는 공중 발판. 진행에 필수는 아닌 보조 경로. */
+  platforms?: { x: number; y: number; w: number; h: number }[];
   playerStart: { x: number; y: number };
   hazard?: {
     x: number;
@@ -55,7 +57,8 @@ export const REGIONS: Record<string, RegionConfig> = {
     worldWidth: 2200,
     groundY: 420,
     playerStart: { x: 80, y: 420 },
-    hazard: { x: 950, y: 420, w: 40, h: 200, label: "함정 (닿으면 회귀)" },
+    hazard: { x: 950, y: 420, w: 44, h: 140, label: "함정 — 점프로 넘으세요" },
+    platforms: [{ x: 650, y: 340, w: 120, h: 16 }],
     savePoint: { id: "sp-1", x: 2080, y: 420, label: "회랑 안쪽 분기점" },
     npcs: [{ id: "isra", label: "이스라", x: 500, y: 420, color: 0x4c6e5c, shape: "leaf", dialogue: israDialogue }],
     nextRegionKey: "ash-market",
@@ -102,7 +105,8 @@ export const REGIONS: Record<string, RegionConfig> = {
     worldWidth: 2000,
     groundY: 420,
     playerStart: { x: 80, y: 420 },
-    hazard: { x: 1000, y: 420, w: 50, h: 220, label: "정면 승부 불가 구간" },
+    hazard: { x: 1000, y: 420, w: 50, h: 150, label: "정면 승부 불가 구간 — 점프로 넘으세요" },
+    platforms: [{ x: 700, y: 340, w: 120, h: 16 }, { x: 1350, y: 340, w: 120, h: 16 }],
     npcs: [{ id: "helga", label: "헬가 도른", x: 1750, y: 420, color: 0xa8873a, shape: "triangle", dialogue: helgaDialogue }],
     // nextRegionKey 없음 — 헬가와의 대화가 끝나면 엔딩으로 이어진다.
   },

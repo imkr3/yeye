@@ -61,6 +61,13 @@ export class RegionScene extends Phaser.Scene {
       const ground = this.add.rectangle(worldWidth / 2, groundY + 20, worldWidth, 8, 0x000000, 0);
       this.physics.add.existing(ground, true);
       this.groundCollider = ground;
+
+      this.platformColliders = (this.config.platforms ?? []).map((p) => {
+        const platform = this.add.rectangle(p.x, p.y, p.w, p.h, 0x3a3225, 0.85);
+        platform.setStrokeStyle(1, 0x6ea78c, 0.4);
+        this.physics.add.existing(platform, true);
+        return platform;
+      });
     }
 
     this.player = drawFieldSilhouette(
@@ -76,6 +83,7 @@ export class RegionScene extends Phaser.Scene {
     if (isSidescroll) {
       playerBody.setCollideWorldBounds(true);
       if (this.groundCollider) this.physics.add.collider(this.player, this.groundCollider);
+      this.platformColliders.forEach((p) => this.physics.add.collider(this.player, p));
     }
     this.cursors = this.input.keyboard!.createCursorKeys();
 
@@ -148,6 +156,7 @@ export class RegionScene extends Phaser.Scene {
   }
 
   private groundCollider?: Phaser.GameObjects.Rectangle;
+  private platformColliders: Phaser.GameObjects.Rectangle[] = [];
 
   update(time: number) {
     const isSidescroll = this.config.movementMode === "sidescroll";
