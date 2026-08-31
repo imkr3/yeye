@@ -133,7 +133,7 @@ export function createInitialRegressionState(startPoint: SavePoint): RegressionS
     deathMemoryByEncounter: {},
     stain: 0,
     overflowState: { active: false, turnsLeft: 0, triggeredThisRun: false },
-    aftershockCoins: 0,
+    aftershockCoins: 60,
     aftershockDust: 0,
     gachaPity: { sinceHighRarity: 0 },
     gachaHistory: [],
@@ -199,6 +199,44 @@ export function setCarriedItems(state: RegressionState, itemIds: string[]): Regr
     accepted.push(id);
   }
   return { ...state, carriedItemIds: accepted };
+}
+
+/**
+ * 서약 역류 — 회귀 사실을 발설했을 때의 대가.
+ * 즉사 함정이 아니라, 잃는 것이 분명하되 되돌릴 길이 있는 상태로 만든다.
+ * 여기서는 가장 최근에 얻은 기억 하나가 흐려지고, 들은 상대가 경계하게 된다.
+ */
+export function applyVowBacklash(state: RegressionState, listenerId: string): RegressionState {
+  const memories = Object.entries(state.deathMemoryByEncounter);
+  const nextMemory = { ...state.deathMemoryByEncounter };
+  if (memories.length > 0) {
+    // 가장 높은 단계의 기억 하나를 한 단계 잃는다.
+    const [worstId] = memories.sort((a, b) => b[1] - a[1])[0];
+    const lowered = Math.max(0, (nextMemory[worstId] ?? 0) - 1);
+    if (lowered === 0) delete nextMemory[worstId];
+    else nextMemory[worstId] = lowered;
+  }
+
+  return {
+    ...state,
+    deathMemoryByEncounter: nextMemory,
+    npcTrust: { ...state.npcTrust, [listenerId]: (state.npcTrust[listenerId] ?? 0) - 2 },
+    storyFlags: state.storyFlags.includes("vow-backlash")
+      ? state.storyFlags
+      : [...state.storyFlags, "vow-backlash"],
+  };
+}
+
+/** 역류를 가라앉힌다 — 규칙 바깥에 있는 자만이 해줄 수 있다. */
+export function clearVowBacklash(state: RegressionState): RegressionState {
+  return {
+    ...state,
+    storyFlags: state.storyFlags.filter((f) => f !== "vow-backlash"),
+  };
+}
+
+export function hasVowBacklash(state: RegressionState): boolean {
+  return state.storyFlags.includes("vow-backlash");
 }
 
 /** 필드 픽업을 주웠을 때 호출. 이미 주운 픽업이면 아무 일도 일어나지 않는다. */

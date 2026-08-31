@@ -1,6 +1,6 @@
 import Phaser from "phaser";
 import { REGIONS, type RegionConfig, type RegionNpcConfig } from "../data/regions";
-import { getState, setState, gameEvents, flushSave } from "../state/gameState";
+import { getState, setState, gameEvents, flushSave, markNearSavePoint } from "../state/gameState";
 import {
   applyDeath,
   advanceSavePoint,
@@ -12,6 +12,9 @@ import {
   deathMemoryTier,
   setStain,
   addCoins,
+  applyVowBacklash,
+  clearVowBacklash,
+  hasVowBacklash,
 } from "../systems/RegressionSystem";
 import type { DialogueSceneData } from "./DialogueScene";
 import type { CombatSceneData } from "./CombatScene";
@@ -132,6 +135,7 @@ export class RegionScene extends Phaser.Scene {
       this.physics.add.existing(spObj, true);
       this.add.text(sp.x, sp.y - 40, "분기점", { fontSize: "12px", color: "#8fbfa4" }).setOrigin(0.5);
       this.physics.add.overlap(this.player, spObj as unknown as Phaser.GameObjects.GameObject, () => {
+        markNearSavePoint();
         this.onReachSavePoint();
       });
 
@@ -424,6 +428,30 @@ export class RegionScene extends Phaser.Scene {
     this.scene.launch("CombatScene", data);
   }
 
+  /**
+   * 대화가 남기는 플래그 처리. 대부분은 그대로 기록하지만,
+   * 서약 역류처럼 상태를 크게 건드리는 것은 여기서 따로 해석한다.
+   */
+  private handleDialogueFlag(flag: string) {
+    const state = getState();
+
+    if (flag.startsWith("reveal-regression:")) {
+      const listener = flag.split(":")[1] ?? "unknown";
+      setState(applyVowBacklash(state, listener));
+      gameEvents.emit("achievement-earned", { label: "서약 역류 — 기억 하나가 흐려졌다" });
+      return;
+    }
+
+    if (flag === "soothe-backlash") {
+      if (!hasVowBacklash(state)) return;
+      setState(clearVowBacklash(state));
+      gameEvents.emit("achievement-earned", { label: "역류가 가라앉았다" });
+      return;
+    }
+
+    setState(addStoryFlag(state, flag));
+  }
+
   private tryAdvanceRegion() {
     const sp = this.config.savePoint;
     if (!sp || getState().currentSavePoint.id !== sp.id) return; // 분기점 갱신 전엔 못 넘어간다
@@ -439,7 +467,7 @@ export class RegionScene extends Phaser.Scene {
     const data: DialogueSceneData = {
       tree: npc.dialogue,
       onTrustDelta: (npcId, delta) => setState(adjustTrust(getState(), npcId, delta)),
-      onFlag: (flag) => setState(addStoryFlag(getState(), flag)),
+      onFlag: (flag) => this.handleDialogueFlag(flag),
       onClose: () => {
         this.dialogueOpen = false;
         this.scene.resume();

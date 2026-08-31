@@ -53,6 +53,20 @@ function scheduleSave() {
   }, 250);
 }
 
+/**
+ * 분기점 근처에 서 있는지 — 가방 교체를 분기점에서만 허용하기 위한 일시 상태.
+ * 겹침 판정은 매 프레임 갱신되므로, 마지막 갱신 시각이 최근이면 근처로 본다.
+ */
+let lastSavePointTouch = 0;
+
+export function markNearSavePoint() {
+  lastSavePointTouch = Date.now();
+}
+
+export function isNearSavePoint(): boolean {
+  return Date.now() - lastSavePointTouch < 400;
+}
+
 export function getState(): RegressionState {
   return state;
 }
