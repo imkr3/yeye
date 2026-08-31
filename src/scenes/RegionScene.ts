@@ -11,8 +11,8 @@ import {
 } from "../systems/RegressionSystem";
 import type { DialogueSceneData } from "./DialogueScene";
 import type { CombatSceneData } from "./CombatScene";
-import { paintRegionBackground, type BackgroundStyle } from "../render/backgrounds";
-import { drawFieldSilhouette, addIdleBreath } from "../render/silhouettes";
+import { paintScenery, type SceneryStyle } from "../render/scenery";
+import { drawVolumetricCharacter, addIdleFloat } from "../render/volumetric";
 
 const JUMP_VELOCITY = -420;
 const GRAVITY_Y = 900;
@@ -49,56 +49,45 @@ export class RegionScene extends Phaser.Scene {
     const worldWidth = isSidescroll ? this.config.worldWidth ?? 2000 : 960;
     const groundY = this.config.groundY ?? 420;
 
-    paintRegionBackground(this, this.config.key as BackgroundStyle, worldWidth);
-    this.add.text(24, 16, this.config.title, { fontFamily: "serif", fontSize: "16px", color: "#e8e1cd" }).setScrollFactor(0);
+    const sceneryGroundY = isSidescroll ? groundY : 150;
+    paintScenery(this, this.config.key as SceneryStyle, worldWidth, sceneryGroundY);
+    this.add
+      .text(24, 16, this.config.title, { fontFamily: "serif", fontSize: "17px", color: "#f0e6d0" })
+      .setScrollFactor(0)
+      .setDepth(100)
+      .setShadow(0, 2, "#000000", 6, false, true);
 
     this.physics.world.setBounds(0, 0, worldWidth, 600);
     this.cameras.main.setBounds(0, 0, worldWidth, 600);
 
     if (isSidescroll) {
       this.physics.world.gravity.y = GRAVITY_Y;
-      // 바닥 — 시각적으로도, 물리적으로도 캐릭터가 서는 기준선.
-      this.add.rectangle(worldWidth / 2, groundY + 22, worldWidth, 44, 0x000000, 0.35);
+      // 바닥 충돌체 — 시각적 바닥은 paintScenery가 그린다.
       const ground = this.add.rectangle(worldWidth / 2, groundY + 20, worldWidth, 8, 0x000000, 0);
       this.physics.add.existing(ground, true);
       this.groundCollider = ground;
 
       this.platformColliders = (this.config.platforms ?? []).map((p) => {
-        const platform = this.add.rectangle(p.x, p.y, p.w, p.h, 0x3a3225, 0.85);
-        platform.setStrokeStyle(1, 0x6ea78c, 0.4);
+        const slab = this.add.graphics().setDepth(1);
+        slab.fillGradientStyle(0x6b5f47, 0x574c39, 0x2a241b, 0x1d1913, 1);
+        slab.fillRect(p.x - p.w / 2, p.y - p.h / 2, p.w, p.h + 6);
+        slab.fillStyle(0x8fbfa4, 0.35);
+        slab.fillRect(p.x - p.w / 2, p.y - p.h / 2, p.w, 2);
+        slab.fillStyle(0x000000, 0.28);
+        slab.fillEllipse(p.x, p.y + p.h / 2 + 10, p.w * 1.1, 12);
+        const platform = this.add.rectangle(p.x, p.y, p.w, p.h, 0x000000, 0);
         this.physics.add.existing(platform, true);
         return platform;
       });
     }
 
-    (this.config.pickups ?? []).forEach((pickup) => {
-      if (getState().collectedPickups.includes(pickup.id)) return; // 이미 주웠으면 다시 안 뜬다
-
-      const icon = this.add.circle(pickup.x, pickup.y, 6, 0xa8873a, 0.9);
-      icon.setStrokeStyle(1, 0xe8e1cd, 0.8);
-      this.tweens.add({
-        targets: icon,
-        y: pickup.y - 6,
-        duration: 900,
-        yoyo: true,
-        repeat: -1,
-        ease: "Sine.InOut",
-      });
-      this.physics.add.existing(icon, true);
-      this.physics.add.overlap(this.player, icon as unknown as Phaser.GameObjects.GameObject, () => {
-        setState(collectPickup(getState(), pickup.id, pickup.fragmentReward));
-        gameEvents.emit("achievement-earned", { label: `파편 +${pickup.fragmentReward}` });
-        icon.destroy();
-      });
+    this.player = drawVolumetricCharacter(this, this.config.playerStart.x, this.config.playerStart.y, {
+      accent: 0xd1616c,
+      cloth: 0x2a2119,
+      crest: "dual-ring",
+      scale: 15,
     });
-
-    this.player = drawFieldSilhouette(
-      this,
-      this.config.playerStart.x,
-      this.config.playerStart.y,
-      0xd1616c,
-      "dual-ring"
-    );
+    this.player.setDepth(4);
     this.physics.add.existing(this.player);
     const playerBody = this.player.body as Phaser.Physics.Arcade.Body;
     playerBody.setCircle(14, -14, -14);
@@ -158,10 +147,16 @@ export class RegionScene extends Phaser.Scene {
     }
 
     this.config.npcs.forEach((npc) => {
-      const npcSilhouette = drawFieldSilhouette(this, npc.x, npc.y, npc.color, npc.shape, 12);
+      const npcSilhouette = drawVolumetricCharacter(this, npc.x, npc.y, {
+        accent: npc.color,
+        cloth: 0x231e19,
+        crest: npc.shape,
+        scale: 14,
+      });
+      npcSilhouette.setDepth(3);
       this.physics.add.existing(npcSilhouette, true);
       (npcSilhouette.body as Phaser.Physics.Arcade.Body).setCircle(12, -12, -12);
-      addIdleBreath(this, npcSilhouette);
+      addIdleFloat(this, npcSilhouette);
       this.add.text(npc.x, npc.y + 22, npc.label, { fontSize: "11px", color: "#cbbfa5" }).setOrigin(0.5);
       this.physics.add.overlap(this.player, npcSilhouette as unknown as Phaser.GameObjects.GameObject, () => {
         this.openDialogue(npc);
@@ -169,10 +164,43 @@ export class RegionScene extends Phaser.Scene {
     });
 
     if (isSidescroll) {
-      this.add.text(24, 580, "← → 이동 · ↑ 점프", { fontSize: "11px", color: "#6b6255" }).setScrollFactor(0);
+      this.add.text(24, 574, "← → 이동 · ↑ 점프", { fontSize: "11px", color: "#8b7f6d" }).setScrollFactor(0).setDepth(100);
     } else {
-      this.add.text(24, 580, "방향키로 이동", { fontSize: "11px", color: "#6b6255" }).setScrollFactor(0);
+      this.add.text(24, 574, "방향키로 이동", { fontSize: "11px", color: "#8b7f6d" }).setScrollFactor(0).setDepth(100);
     }
+
+    // 픽업 — 플레이어가 만들어진 뒤에 배치해야 overlap 대상이 유효하다.
+    (this.config.pickups ?? []).forEach((pickup) => {
+      if (getState().collectedPickups.includes(pickup.id)) return; // 이미 주웠으면 다시 안 뜬다
+
+      const icon = this.add.container(pickup.x, pickup.y).setDepth(5);
+      const glow = this.add.graphics();
+      for (let i = 4; i >= 1; i--) {
+        glow.fillStyle(0xd8a24a, 0.09 * i);
+        glow.fillCircle(0, 0, 5 + i * 3.4);
+      }
+      const shard = this.add.graphics();
+      shard.fillGradientStyle(0xffe7a8, 0xd8a24a, 0xa8783a, 0x6b4a1e, 1);
+      shard.beginPath();
+      shard.moveTo(0, -8);
+      shard.lineTo(5.5, 0);
+      shard.lineTo(0, 8);
+      shard.lineTo(-5.5, 0);
+      shard.closePath();
+      shard.fillPath();
+      icon.add([glow, shard]);
+
+      this.tweens.add({ targets: icon, y: pickup.y - 7, duration: 900, yoyo: true, repeat: -1, ease: "Sine.InOut" });
+      this.tweens.add({ targets: shard, scaleX: 0.35, duration: 1400, yoyo: true, repeat: -1, ease: "Sine.InOut" });
+
+      this.physics.add.existing(icon, true);
+      (icon.body as Phaser.Physics.Arcade.StaticBody).setCircle(14, -14, -14);
+      this.physics.add.overlap(this.player, icon as unknown as Phaser.GameObjects.GameObject, () => {
+        setState(collectPickup(getState(), pickup.id, pickup.fragmentReward));
+        gameEvents.emit("achievement-earned", { label: `파편 +${pickup.fragmentReward}` });
+        icon.destroy();
+      });
+    });
 
     gameEvents.emit("regression-updated", getState());
   }
