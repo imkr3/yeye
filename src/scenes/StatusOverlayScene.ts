@@ -33,6 +33,17 @@ export class StatusOverlayScene extends Phaser.Scene {
       color: "#4a4137",
     });
 
+    const settingsBtn = this.add.text(830, 566, "◆ 설정", {
+      fontFamily: "monospace",
+      fontSize: "13px",
+      color: "#8b8299",
+    }).setInteractive({ useHandCursor: true });
+    settingsBtn.on("pointerdown", () => {
+      this.scene.pause("RegionScene");
+      this.scene.launch("SettingsScene");
+      this.scene.get("SettingsScene").events.once("shutdown", () => this.scene.resume("RegionScene"));
+    });
+
     const inventoryBtn = this.add.text(716, 566, "◆ 인벤토리", {
       fontFamily: "monospace",
       fontSize: "13px",

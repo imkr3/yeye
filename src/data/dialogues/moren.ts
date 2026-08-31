@@ -62,7 +62,21 @@ export const morenDialogue: DialogueTree = {
       id: "farewell",
       speaker: "모른",
       line: "더 물을 게 없다면, 돌아가도 좋아요.",
-      choices: [{ label: "돌아간다", next: "end-moren" }],
+      choices: [
+        {
+          label: "목덜미가 무겁다고 털어놓는다",
+          next: "soothe-backlash",
+          flag: "soothe-backlash",
+        },
+        { label: "돌아간다", next: "end-moren" },
+      ],
+    },
+    "soothe-backlash": {
+      id: "soothe-backlash",
+      speaker: "모른",
+      line:
+        "아, 그거요. 어디서 입을 놀렸군요. …여기 앉아요. 내가 대신 한 번 세어줄게요. 하나, 둘. — 세는 소리를 따라가는 동안 목덜미의 무게가 슬며시 내려간다.",
+      end: true,
     },
     "end-moren": {
       id: "end-moren",

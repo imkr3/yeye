@@ -34,9 +34,29 @@ export const rivDialogue: DialogueTree = {
             next: "evasive-response",
             trustDelta: -1,
           },
+          {
+            // 회귀를 입 밖에 낸다 — 세계가 그것을 듣는다.
+            keywords: ["회귀", "되돌", "다시 살", "몇 번째", "반복"],
+            next: "vow-backlash",
+            flag: "reveal-regression:riv",
+          },
         ],
         fallback: { next: "neutral-response", trustDelta: 0 },
       },
+    },
+    "vow-backlash": {
+      id: "vow-backlash",
+      speaker: "리브 칸",
+      line:
+        "…방금 뭐라고 했어요? 아니, 됐어요. 못 들은 걸로 할게요. — 말을 끝맺기도 전에, 목덜미가 무겁게 눌린다. 무언가가 방금 그 문장을 받아 적은 것 같다.",
+      next: "vow-backlash-after",
+    },
+    "vow-backlash-after": {
+      id: "vow-backlash-after",
+      speaker: "리브 칸",
+      line:
+        "당신, 얼굴이 안 좋아요. 여기서는 그런 얘기 하는 거 아니에요. …계단 쪽에 가보세요. 거긴 규칙이 좀 헐겁다고들 하니까.",
+      end: true,
     },
     "honest-response": {
       id: "honest-response",

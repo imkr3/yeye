@@ -3,24 +3,27 @@ import Phaser from "phaser";
 /**
  * 지역 배경 절차적 렌더러 — 단색 배경 대신, 각 지역의 정체성을 저비용으로
  * 표현하기 위한 레이어. 08번 섹션 팔레트(잉크-양피지 톤 + 계통색 포인트)를 따른다.
- * 공통으로 비네트(가장자리 음영)를 덧씌워 어느 지역이든 화면 중앙에 시선이 모이게 한다.
+ *
+ * width는 지역의 실제 월드 폭이다. 탑다운 지역은 화면 폭(960)과 같지만,
+ * 횡스크롤 지역은 카메라보다 훨씬 넓은 값을 받는다. 비네트만은 예외로,
+ * 카메라 뷰포트(960×600) 기준 화면 고정 오버레이라 월드 폭과 무관하게 그린다.
  */
 
 export type BackgroundStyle = "sunken-corridor" | "ash-market" | "frost-observatory" | "endless-stairs";
 
-export function paintRegionBackground(scene: Phaser.Scene, style: BackgroundStyle) {
+export function paintRegionBackground(scene: Phaser.Scene, style: BackgroundStyle, width = 960) {
   switch (style) {
     case "sunken-corridor":
-      paintSunkenCorridor(scene);
+      paintSunkenCorridor(scene, width);
       break;
     case "ash-market":
-      paintAshMarket(scene);
+      paintAshMarket(scene, width);
       break;
     case "frost-observatory":
-      paintFrostObservatory(scene);
+      paintFrostObservatory(scene, width);
       break;
     case "endless-stairs":
-      paintEndlessStairs(scene);
+      paintEndlessStairs(scene, width);
       break;
   }
   paintVignette(scene);
@@ -28,7 +31,7 @@ export function paintRegionBackground(scene: Phaser.Scene, style: BackgroundStyl
 
 function paintVignette(scene: Phaser.Scene) {
   const g = scene.add.graphics();
-  // 화면 가장자리를 겹겹이 어둡게 칠해 중앙으로 시선이 모이게 한다 (그라데이션 흉내).
+  g.setScrollFactor(0); // 카메라가 움직여도 화면 가장자리에 고정된다.
   g.fillStyle(0x000000, 0.18);
   g.fillRect(0, 0, 960, 26);
   g.fillRect(0, 574, 960, 26);
@@ -66,9 +69,10 @@ function driftingParticle(
   return dot;
 }
 
-function paintSunkenCorridor(scene: Phaser.Scene) {
-  scene.add.rectangle(480, 300, 960, 600, 0x0e1a15);
-  scene.add.rectangle(480, 300, 960, 600, 0x14211c, 0.6);
+function paintSunkenCorridor(scene: Phaser.Scene, width: number) {
+  const cx = width / 2;
+  scene.add.rectangle(cx, 300, width, 600, 0x0e1a15);
+  scene.add.rectangle(cx, 300, width, 600, 0x14211c, 0.6);
 
   // 물결 — 가로로 흐르는 곡선 여러 겹, 천천히 위아래로 유영
   for (let row = 0; row < 6; row++) {
@@ -76,7 +80,7 @@ function paintSunkenCorridor(scene: Phaser.Scene) {
     const g = scene.add.graphics();
     g.lineStyle(1.5, 0x4c6e5c, 0.3);
     g.beginPath();
-    for (let x = 0; x <= 960; x += 20) {
+    for (let x = 0; x <= width; x += 20) {
       const y = Math.sin((x + row * 40) / 60) * 10;
       if (x === 0) g.moveTo(x, y);
       else g.lineTo(x, y);
@@ -93,50 +97,56 @@ function paintSunkenCorridor(scene: Phaser.Scene) {
     });
   }
 
-  for (let i = 0; i < 26; i++) {
-    driftingParticle(scene, Phaser.Math.Between(0, 960), Phaser.Math.Between(80, 560), 1.5, 0x8fbfa4, 0.3);
+  const particleCount = Math.round(26 * (width / 960));
+  for (let i = 0; i < particleCount; i++) {
+    driftingParticle(scene, Phaser.Math.Between(0, width), Phaser.Math.Between(80, 560), 1.5, 0x8fbfa4, 0.3);
   }
 }
 
-function paintAshMarket(scene: Phaser.Scene) {
-  scene.add.rectangle(480, 300, 960, 600, 0x1c1610);
-  scene.add.rectangle(480, 300, 960, 600, 0x2a2015, 0.7);
+function paintAshMarket(scene: Phaser.Scene, width: number) {
+  const cx = width / 2;
+  scene.add.rectangle(cx, 300, width, 600, 0x1c1610);
+  scene.add.rectangle(cx, 300, width, 600, 0x2a2015, 0.7);
 
-  const stalls = [
-    { x: 160, w: 100 }, { x: 340, w: 80 }, { x: 560, w: 120 }, { x: 780, w: 90 },
-  ];
-  stalls.forEach((s) => {
+  const stallCount = Math.max(4, Math.round(4 * (width / 960)));
+  const spacing = width / (stallCount + 1);
+  for (let i = 1; i <= stallCount; i++) {
+    const x = spacing * i;
+    const w = Phaser.Math.Between(80, 120);
+
     const roof = scene.add.graphics();
     roof.fillStyle(0x2f2416, 1);
     roof.lineStyle(1, 0xa8873a, 0.4);
     roof.beginPath();
-    roof.moveTo(s.x - s.w / 2 - 6, 480);
-    roof.lineTo(s.x, 460);
-    roof.lineTo(s.x + s.w / 2 + 6, 480);
+    roof.moveTo(x - w / 2 - 6, 480);
+    roof.lineTo(x, 460);
+    roof.lineTo(x + w / 2 + 6, 480);
     roof.closePath();
     roof.fillPath();
     roof.strokePath();
 
-    const stall = scene.add.rectangle(s.x, 500, s.w, 40, 0x3a2c1c, 0.85);
+    const stall = scene.add.rectangle(x, 500, w, 40, 0x3a2c1c, 0.85);
     stall.setStrokeStyle(1, 0xa8873a, 0.4);
-  });
+  }
 
-  for (let i = 0; i < 40; i++) {
-    driftingParticle(scene, Phaser.Math.Between(0, 960), Phaser.Math.Between(0, 460), Phaser.Math.Between(1, 2), 0xa8873a, 0.25);
+  const particleCount = Math.round(40 * (width / 960));
+  for (let i = 0; i < particleCount; i++) {
+    driftingParticle(scene, Phaser.Math.Between(0, width), Phaser.Math.Between(0, 460), Phaser.Math.Between(1, 2), 0xa8873a, 0.25);
   }
 }
 
-function paintFrostObservatory(scene: Phaser.Scene) {
-  scene.add.rectangle(480, 300, 960, 600, 0x090e17);
-  scene.add.rectangle(480, 300, 960, 600, 0x1a2230, 0.6);
+function paintFrostObservatory(scene: Phaser.Scene, width: number) {
+  const cx = width / 2;
+  scene.add.rectangle(cx, 300, width, 600, 0x090e17);
+  scene.add.rectangle(cx, 300, width, 600, 0x1a2230, 0.6);
 
-  const positions = [
-    { x: 150, y: 120 }, { x: 780, y: 100 }, { x: 250, y: 480 }, { x: 700, y: 500 }, { x: 480, y: 300 },
-  ];
-  positions.forEach((p) => {
+  const crystalCount = Math.max(5, Math.round(5 * (width / 960)));
+  for (let i = 0; i < crystalCount; i++) {
+    const x = Phaser.Math.Between(80, width - 80);
+    const y = Phaser.Math.Between(80, 520);
     const g = scene.add.graphics();
     g.lineStyle(1, 0x6ea78c, 0.22);
-    drawFrostCrystal(g, p.x, p.y, 36);
+    drawFrostCrystal(g, x, y, 36);
     scene.tweens.add({
       targets: g,
       alpha: 0.4,
@@ -145,10 +155,11 @@ function paintFrostObservatory(scene: Phaser.Scene) {
       repeat: -1,
       ease: "Sine.InOut",
     });
-  });
+  }
 
-  for (let i = 0; i < 30; i++) {
-    driftingParticle(scene, Phaser.Math.Between(0, 960), Phaser.Math.Between(0, 600), 1, 0xe8e1cd, 0.2);
+  const particleCount = Math.round(30 * (width / 960));
+  for (let i = 0; i < particleCount; i++) {
+    driftingParticle(scene, Phaser.Math.Between(0, width), Phaser.Math.Between(0, 600), 1, 0xe8e1cd, 0.2);
   }
 }
 
@@ -164,17 +175,19 @@ function drawFrostCrystal(g: Phaser.GameObjects.Graphics, cx: number, cy: number
   }
 }
 
-function paintEndlessStairs(scene: Phaser.Scene) {
-  scene.add.rectangle(480, 300, 960, 600, 0x14100c);
-  scene.add.rectangle(480, 300, 960, 600, 0x22201e, 0.7);
+function paintEndlessStairs(scene: Phaser.Scene, width: number) {
+  const cx = width / 2;
+  scene.add.rectangle(cx, 300, width, 600, 0x14100c);
+  scene.add.rectangle(cx, 300, width, 600, 0x22201e, 0.7);
 
   for (let step = 0; step < 8; step++) {
     const y = step * 75;
-    const tread = scene.add.rectangle(480, y + 3, 960, 6, 0x2b241c, 1);
+    const tread = scene.add.rectangle(cx, y + 3, width, 6, 0x2b241c, 1);
     tread.setStrokeStyle(1, 0x8c8168, 0.3);
   }
 
-  for (let i = 0; i < 20; i++) {
-    driftingParticle(scene, Phaser.Math.Between(0, 960), Phaser.Math.Between(0, 600), 1, 0x8c8168, 0.2);
+  const particleCount = Math.round(20 * (width / 960));
+  for (let i = 0; i < particleCount; i++) {
+    driftingParticle(scene, Phaser.Math.Between(0, width), Phaser.Math.Between(0, 600), 1, 0x8c8168, 0.2);
   }
 }
