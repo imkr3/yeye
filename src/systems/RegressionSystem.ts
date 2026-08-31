@@ -39,7 +39,11 @@ export interface RegressionState {
   storyFlags: string[];
   /** 가챠로 뽑은 소모품/유물 id 목록. 소모품은 중복 보유 가능, 유물은 진열대 슬롯 제한이 따로 있다. */
   inventory: { consumables: string[]; relics: string[] };
+  /** 진열대에 장착한 유물 id. 설계 문서 1.7 — 초반 슬롯은 2칸으로 제한한다. */
+  equippedRelics: string[];
 }
+
+export const RELIC_SLOT_LIMIT = 2;
 
 // 죽음 페널티 예시 풀 — 설계 문서 1.3의 "경미" 등급 예시.
 // 전투 불능급으로 세지 않고, 불편하고 성가신 방향으로만 설계한다.
@@ -75,7 +79,20 @@ export function createInitialRegressionState(startPoint: SavePoint): RegressionS
     npcTrust: {},
     storyFlags: [],
     inventory: { consumables: [], relics: [] },
+    equippedRelics: [],
   };
+}
+
+/** 유물을 진열대에 장착한다. 슬롯이 가득 찼거나 이미 장착 중이면 아무 일도 일어나지 않는다. */
+export function equipRelic(state: RegressionState, itemId: string): RegressionState {
+  if (state.equippedRelics.includes(itemId)) return state;
+  if (state.equippedRelics.length >= RELIC_SLOT_LIMIT) return state;
+  if (!state.inventory.relics.includes(itemId)) return state;
+  return { ...state, equippedRelics: [...state.equippedRelics, itemId] };
+}
+
+export function unequipRelic(state: RegressionState, itemId: string): RegressionState {
+  return { ...state, equippedRelics: state.equippedRelics.filter((id) => id !== itemId) };
 }
 
 /** 가챠로 소모품을 얻었을 때 인벤토리에 추가한다. */
