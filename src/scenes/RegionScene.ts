@@ -105,7 +105,7 @@ export class RegionScene extends Phaser.Scene {
     gameEvents.emit("regression-updated", getState());
   }
 
-  update() {
+  update(time: number) {
     const body = this.player.body as Phaser.Physics.Arcade.Body;
     const speed = 200;
     body.setVelocity(0);
@@ -115,6 +115,14 @@ export class RegionScene extends Phaser.Scene {
 
     if (this.cursors.up?.isDown) body.setVelocityY(-speed);
     else if (this.cursors.down?.isDown) body.setVelocityY(speed);
+
+    const moving = body.velocity.x !== 0 || body.velocity.y !== 0;
+    if (moving) {
+      const bob = Math.sin(time / 80) * 0.05;
+      this.player.setScale(1, 1 + bob);
+    } else {
+      this.player.setScale(1, 1);
+    }
   }
 
   private onDeath() {
@@ -139,8 +147,11 @@ export class RegionScene extends Phaser.Scene {
       y: sp.y,
       label: sp.label,
     });
-    next = grantAchievement(next, `reach-${this.config.key}-branch`, 30);
+    const achievementId = `reach-${this.config.key}-branch`;
+    const isNew = !next.achievements.includes(achievementId);
+    next = grantAchievement(next, achievementId, 30);
     setState(next);
+    if (isNew) gameEvents.emit("achievement-earned", { label: sp.label });
   }
 
   private openCombat(combat: { encounterId: string; enemyName: string; enemyMaxHp: number }) {
@@ -154,8 +165,10 @@ export class RegionScene extends Phaser.Scene {
       hasMemory,
       onResult: (result) => {
         if (result === "win") {
-          let next = grantAchievement(getState(), `defeat-${combat.encounterId}`, 20);
-          setState(next);
+          const achievementId = `defeat-${combat.encounterId}`;
+          const isNew = !getState().achievements.includes(achievementId);
+          setState(grantAchievement(getState(), achievementId, 20));
+          if (isNew) gameEvents.emit("achievement-earned", { label: `${combat.enemyName} 격파` });
         } else {
           let next = applyDeath(getState());
           next = addStoryFlag(next, `seen-${combat.encounterId}`);

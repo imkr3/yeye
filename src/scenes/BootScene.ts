@@ -17,5 +17,6 @@ export class BootScene extends Phaser.Scene {
   create() {
     this.scene.start("RegionScene", { regionKey: FIRST_REGION_KEY });
     this.scene.launch("StatusOverlayScene");
+    this.scene.launch("ToastScene");
   }
 }

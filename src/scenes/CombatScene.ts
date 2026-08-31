@@ -121,11 +121,30 @@ export class CombatScene extends Phaser.Scene {
     }
   }
 
+  private spawnDamageNumber(x: number, y: number, value: number, color: string) {
+    if (value <= 0) return;
+    const text = this.add.text(x, y, `-${value}`, {
+      fontFamily: "monospace",
+      fontSize: "16px",
+      color,
+    }).setOrigin(0.5);
+    this.tweens.add({
+      targets: text,
+      y: y - 40,
+      alpha: 0,
+      duration: 700,
+      ease: "Cubic.Out",
+      onComplete: () => text.destroy(),
+    });
+  }
+
   private playerTurn(outcome: ReturnType<typeof useBasicStrike>) {
     if (this.resolved) return;
     this.enemyHp -= outcome.damageToEnemy;
     this.playerHp -= outcome.damageToSelf;
     this.logText.setText(outcome.log);
+    this.spawnDamageNumber(640, 260, outcome.damageToEnemy, "#e08a92");
+    this.spawnDamageNumber(320, 260, outcome.damageToSelf, "#d1616c");
 
     if (this.enemyHp <= 0) {
       this.finish("win");
@@ -142,6 +161,7 @@ export class CombatScene extends Phaser.Scene {
     this.playerHp -= outcome.damageToSelf;
     this.turn += 1;
     this.logText.setText(outcome.log);
+    this.spawnDamageNumber(320, 260, outcome.damageToSelf, "#d1616c");
     this.renderStatus();
     this.renderButtons();
 
