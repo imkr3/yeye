@@ -208,3 +208,148 @@ export function addIdleFloat(scene: Phaser.Scene, target: Phaser.GameObjects.Con
     ease: "Sine.InOut",
   });
 }
+
+export type CreatureForm = "swarm" | "humanoid" | "beast" | "seated";
+
+/**
+ * 적 실루엣 — 캐릭터와 같은 광원 규칙을 쓰되, 형태를 종류별로 달리한다.
+ * 평면 도형이 아니라 겹쳐 쌓은 음영 덩어리로 부피를 만든다.
+ */
+export function drawCreature(
+  scene: Phaser.Scene,
+  x: number,
+  y: number,
+  form: CreatureForm,
+  accent: number,
+  scale = 46
+): Phaser.GameObjects.Container {
+  const parts: Phaser.GameObjects.GameObject[] = [];
+  const body = 0x1a1620;
+
+  // 후광
+  const halo = scene.add.graphics();
+  for (let i = 6; i >= 1; i--) {
+    halo.fillStyle(accent, 0.03 * i);
+    halo.fillCircle(0, 0, scale * (0.7 + i * 0.24));
+  }
+  parts.push(halo);
+
+  // 접지 그림자
+  const shadow = scene.add.graphics();
+  for (let i = 5; i >= 1; i--) {
+    const t = i / 5;
+    shadow.fillStyle(0x000000, 0.14 * (1 - t) + 0.05);
+    shadow.fillEllipse(0, scale * 0.92, scale * 2.4 * t, scale * 0.5 * t);
+  }
+  parts.push(shadow);
+
+  const g = scene.add.graphics();
+
+  const blob = (cx: number, cy: number, r: number, tint = 0) => {
+    const steps = 12;
+    for (let i = steps; i >= 0; i--) {
+      const t = i / steps;
+      const base = tint ? lerpColor(body, tint, 0.35) : body;
+      const lit = lerpColor(shade(base, -0.5), lerpColor(base, LIGHT, 0.5), 1 - t);
+      g.fillStyle(lit, 1);
+      g.fillCircle(cx - r * 0.22 * (1 - t), cy - r * 0.26 * (1 - t), r * t);
+    }
+    g.lineStyle(1.4, lerpColor(accent, LIGHT, 0.3), 0.6);
+    g.beginPath();
+    g.arc(cx, cy, r * 0.96, Phaser.Math.DegToRad(20), Phaser.Math.DegToRad(140), false);
+    g.strokePath();
+  };
+
+  switch (form) {
+    case "swarm": {
+      // 여러 조각이 한 덩어리로 뭉쳐 있는 형태
+      const seeds = [
+        [0, 0, 1], [-0.62, 0.28, 0.62], [0.6, 0.22, 0.66], [-0.3, -0.5, 0.5], [0.36, -0.46, 0.45],
+      ];
+      seeds.forEach(([sx, sy, sr]) => blob(sx * scale, sy * scale, sr * scale * 0.55, accent));
+      break;
+    }
+    case "humanoid": {
+      blob(0, scale * 0.35, scale * 0.62);
+      blob(0, -scale * 0.42, scale * 0.4);
+      // 늘어뜨린 팔
+      g.lineStyle(scale * 0.16, shade(body, -0.35), 1);
+      g.beginPath();
+      g.moveTo(-scale * 0.5, scale * 0.05);
+      g.lineTo(-scale * 0.68, scale * 0.7);
+      g.moveTo(scale * 0.5, scale * 0.05);
+      g.lineTo(scale * 0.7, scale * 0.66);
+      g.strokePath();
+      // 봉합선
+      g.lineStyle(1.6, lerpColor(accent, LIGHT, 0.2), 0.7);
+      for (let i = -2; i <= 2; i++) {
+        g.beginPath();
+        g.moveTo(-scale * 0.26, scale * (0.2 + i * 0.13));
+        g.lineTo(scale * 0.26, scale * (0.24 + i * 0.13));
+        g.strokePath();
+      }
+      break;
+    }
+    case "beast": {
+      blob(scale * 0.1, scale * 0.3, scale * 0.6);
+      blob(-scale * 0.66, scale * 0.06, scale * 0.36);
+      g.lineStyle(scale * 0.13, shade(body, -0.4), 1);
+      g.beginPath();
+      g.moveTo(-scale * 0.4, scale * 0.6);
+      g.lineTo(-scale * 0.5, scale * 0.92);
+      g.moveTo(scale * 0.35, scale * 0.62);
+      g.lineTo(scale * 0.48, scale * 0.92);
+      g.strokePath();
+      // 등줄기 광맥
+      g.lineStyle(2, accent, 0.7);
+      g.beginPath();
+      g.moveTo(-scale * 0.5, -scale * 0.1);
+      g.lineTo(0, -scale * 0.3);
+      g.lineTo(scale * 0.55, -scale * 0.02);
+      g.strokePath();
+      break;
+    }
+    case "seated": {
+      // 앉은 채 손가락을 세는 형상
+      blob(0, scale * 0.5, scale * 0.78);
+      blob(0, -scale * 0.28, scale * 0.42);
+      g.lineStyle(scale * 0.12, shade(body, -0.3), 1);
+      g.beginPath();
+      g.moveTo(-scale * 0.46, scale * 0.16);
+      g.lineTo(-scale * 0.16, scale * 0.42);
+      g.moveTo(scale * 0.46, scale * 0.16);
+      g.lineTo(scale * 0.16, scale * 0.42);
+      g.strokePath();
+      // 세고 있는 손가락
+      g.lineStyle(2.2, lerpColor(accent, LIGHT, 0.45), 0.9);
+      for (let i = 0; i < 4; i++) {
+        const fx = -scale * 0.2 + i * scale * 0.13;
+        g.beginPath();
+        g.moveTo(fx, scale * 0.42);
+        g.lineTo(fx + scale * 0.03, scale * 0.42 - scale * (0.1 + i * 0.05));
+        g.strokePath();
+      }
+      break;
+    }
+  }
+  parts.push(g);
+
+  return scene.add.container(x, y, parts);
+}
+
+/** 적 종류에 맞는 형태를 고른다. */
+export function creatureFormFor(enemyId: string): CreatureForm {
+  switch (enemyId) {
+    case "glass-mite":
+    case "stairwell-wreckage":
+      return "swarm";
+    case "sutured-pilgrim":
+      return "humanoid";
+    case "backflow-hound":
+      return "beast";
+    case "pulse-counter":
+      return "seated";
+    default:
+      return "humanoid";
+  }
+}

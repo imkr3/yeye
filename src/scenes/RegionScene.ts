@@ -8,9 +8,16 @@ import {
   addStoryFlag,
   grantAchievement,
   collectPickup,
+  advanceDeathMemory,
+  deathMemoryTier,
+  setStain,
+  addCoins,
 } from "../systems/RegressionSystem";
 import type { DialogueSceneData } from "./DialogueScene";
 import type { CombatSceneData } from "./CombatScene";
+import { RIFT_ENEMIES } from "../data/rifts/enemies";
+import { PLAYER_BASE } from "../data/combat/balance";
+import { relicModifiers } from "../systems/EffectRegistry";
 import { paintScenery, type SceneryStyle } from "../render/scenery";
 import { drawVolumetricCharacter, addIdleFloat } from "../render/volumetric";
 
@@ -298,29 +305,48 @@ export class RegionScene extends Phaser.Scene {
   }
 
   private openCombat(combat: { encounterId: string; enemyName: string; enemyMaxHp: number }) {
+    const enemyDef = RIFT_ENEMIES[combat.encounterId];
+    if (!enemyDef) {
+      // 정의가 없는 인카운터는 즉사 함정으로 처리해 진행이 막히지 않게 한다.
+      this.onDeath();
+      return;
+    }
+
     this.scene.pause();
-    const hasMemory = getState().storyFlags.includes(`seen-${combat.encounterId}`);
+    const state = getState();
 
     const data: CombatSceneData = {
       encounterId: combat.encounterId,
-      enemyName: combat.enemyName,
-      enemyMaxHp: combat.enemyMaxHp,
-      hasMemory,
-      onResult: (result) => {
-        if (result === "win") {
+      enemy: enemyDef,
+      memoryTier: deathMemoryTier(state, combat.encounterId),
+      playerHp: PLAYER_BASE.maxHp,
+      playerMaxHp: PLAYER_BASE.maxHp,
+      stain: state.stain,
+      carriedItems: state.carriedItemIds,
+      onResult: (outcome) => {
+        let next = setStain(getState(), outcome.stain);
+        if (outcome.fragmentsEarned > 0) {
+          next = { ...next, fragments: next.fragments + outcome.fragmentsEarned };
+        }
+
+        if (outcome.result === "win") {
           const achievementId = `defeat-${combat.encounterId}`;
-          const isNew = !getState().achievements.includes(achievementId);
-          setState(grantAchievement(getState(), achievementId, 20));
-          if (isNew) gameEvents.emit("achievement-earned", { label: `${combat.enemyName} 격파` });
+          const isNew = !next.achievements.includes(achievementId);
+          next = grantAchievement(next, achievementId, 20);
+          next = addCoins(next, Math.round(24 * relicModifiers(next.equippedRelics).coinMultiplier));
+          setState(next);
+          if (isNew) gameEvents.emit("achievement-earned", { label: `${enemyDef.name} 격파` });
         } else {
-          let next = applyDeath(getState());
+          next = applyDeath(next);
+          next = advanceDeathMemory(next, combat.encounterId);
           next = addStoryFlag(next, `seen-${combat.encounterId}`);
           setState(next);
         }
+
         this.scene.resume();
         this.hazardTriggered = false;
 
-        if (result === "lose") {
+        if (outcome.result === "lose") {
           const sp = getState().currentSavePoint;
           this.player.setPosition(sp.x, sp.y);
           (this.player.body as Phaser.Physics.Arcade.Body).setVelocity(0, 0);
