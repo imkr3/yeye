@@ -27,10 +27,21 @@ export class StatusOverlayScene extends Phaser.Scene {
       wordWrap: { width: 224 },
     });
 
-    this.shopBtn = this.add.text(716, 560, "◆ 상점 [잠김]", {
+    this.shopBtn = this.add.text(716, 540, "◆ 상점 [잠김]", {
       fontFamily: "monospace",
       fontSize: "13px",
       color: "#4a4137",
+    });
+
+    const inventoryBtn = this.add.text(716, 566, "◆ 인벤토리", {
+      fontFamily: "monospace",
+      fontSize: "13px",
+      color: "#6ea78c",
+    }).setInteractive({ useHandCursor: true });
+    inventoryBtn.on("pointerdown", () => {
+      this.scene.pause("RegionScene");
+      this.scene.launch("InventoryScene");
+      this.scene.get("InventoryScene").events.once("shutdown", () => this.scene.resume("RegionScene"));
     });
 
     this.flash = this.add.rectangle(480, 300, 960, 600, 0x7c1f2b, 0).setDepth(100);
