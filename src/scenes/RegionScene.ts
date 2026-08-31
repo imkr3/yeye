@@ -9,6 +9,7 @@ import {
   grantAchievement,
 } from "../systems/RegressionSystem";
 import type { DialogueSceneData } from "./DialogueScene";
+import type { CombatSceneData } from "./CombatScene";
 import { paintRegionBackground, type BackgroundStyle } from "../render/backgrounds";
 import { drawFieldSilhouette } from "../render/silhouettes";
 
@@ -57,7 +58,8 @@ export class RegionScene extends Phaser.Scene {
       this.physics.add.overlap(this.player, hazardObj as unknown as Phaser.GameObjects.GameObject, () => {
         if (this.hazardTriggered) return;
         this.hazardTriggered = true;
-        this.onDeath();
+        if (h.combat) this.openCombat(h.combat);
+        else this.onDeath();
       });
     }
 
@@ -139,6 +141,36 @@ export class RegionScene extends Phaser.Scene {
     });
     next = grantAchievement(next, `reach-${this.config.key}-branch`, 30);
     setState(next);
+  }
+
+  private openCombat(combat: { encounterId: string; enemyName: string; enemyMaxHp: number }) {
+    this.scene.pause();
+    const hasMemory = getState().storyFlags.includes(`seen-${combat.encounterId}`);
+
+    const data: CombatSceneData = {
+      encounterId: combat.encounterId,
+      enemyName: combat.enemyName,
+      enemyMaxHp: combat.enemyMaxHp,
+      hasMemory,
+      onResult: (result) => {
+        if (result === "win") {
+          let next = grantAchievement(getState(), `defeat-${combat.encounterId}`, 20);
+          setState(next);
+        } else {
+          let next = applyDeath(getState());
+          next = addStoryFlag(next, `seen-${combat.encounterId}`);
+          setState(next);
+        }
+        this.scene.resume();
+        this.hazardTriggered = false;
+
+        if (result === "lose") {
+          const sp = getState().currentSavePoint;
+          this.player.setPosition(sp.x, sp.y);
+        }
+      },
+    };
+    this.scene.launch("CombatScene", data);
   }
 
   private tryAdvanceRegion() {

@@ -20,7 +20,15 @@ export interface RegionConfig {
   title: string;
   backgroundColor: number;
   playerStart: { x: number; y: number };
-  hazard?: { x: number; y: number; w: number; h: number; label: string };
+  hazard?: {
+    x: number;
+    y: number;
+    w: number;
+    h: number;
+    label: string;
+    /** 있으면 즉사 대신 CombatScene을 연다. */
+    combat?: { encounterId: string; enemyName: string; enemyMaxHp: number };
+  };
   savePoint?: { id: string; x: number; y: number; label: string };
   npcs: RegionNpcConfig[];
   /** 분기점 도달 후 열리는 다음 지역. 없으면 이 지역이 이야기의 종착점. */
@@ -55,7 +63,14 @@ export const REGIONS: Record<string, RegionConfig> = {
     title: "끝없는 계단",
     backgroundColor: 0x22201e,
     playerStart: { x: 480, y: 60 },
-    hazard: { x: 480, y: 300, w: 960, h: 30, label: "무너지는 계단참" },
+    hazard: {
+      x: 480,
+      y: 300,
+      w: 960,
+      h: 30,
+      label: "무너지는 계단참 (닿으면 전투)",
+      combat: { encounterId: "stairwell-wreckage", enemyName: "무너진 잔해", enemyMaxHp: 40 },
+    },
     npcs: [{ id: "moren", label: "모른", x: 480, y: 480, color: 0x8c8168, shape: "zigzag", dialogue: morenDialogue }],
     sideExit: { x: 480, y: 560, toRegionKey: "ash-market", label: "재의 시장으로 돌아가기" },
   },
