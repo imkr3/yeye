@@ -11,6 +11,8 @@ export interface DialogueChoice {
   label: string;
   next: string;
   trustDelta?: number;
+  /** 엔딩 판정 등에 쓰이는 스토리 플래그. */
+  flag?: string;
 }
 
 export interface FreeTextBranch {
@@ -18,6 +20,7 @@ export interface FreeTextBranch {
   keywords: string[];
   next: string;
   trustDelta?: number;
+  flag?: string;
 }
 
 export interface DialogueNode {
@@ -30,7 +33,7 @@ export interface DialogueNode {
   freeText?: {
     prompt: string;
     branches: FreeTextBranch[];
-    fallback: { next: string; trustDelta?: number };
+    fallback: { next: string; trustDelta?: number; flag?: string };
   };
   /** 분기 없이 다음으로 자동 진행 (대사 나열용) */
   next?: string;
@@ -40,6 +43,8 @@ export interface DialogueNode {
 
 export interface DialogueTree {
   npcId: string;
+  /** 대화 UI에 표시할 계통색 문장. 비주얼 디렉션(08번 섹션) 팔레트 참고. */
+  crestColor: number;
   startNode: string;
   nodes: Record<string, DialogueNode>;
 }
@@ -57,13 +62,13 @@ export function getNode(tree: DialogueTree, nodeId: string): DialogueNode {
 export function evaluateFreeText(
   input: string,
   node: DialogueNode
-): { next: string; trustDelta?: number } {
+): { next: string; trustDelta?: number; flag?: string } {
   if (!node.freeText) throw new Error("자유 입력 노드가 아닙니다.");
   const normalized = input.trim().toLowerCase();
 
   for (const branch of node.freeText.branches) {
     if (branch.keywords.some((k) => normalized.includes(k.toLowerCase()))) {
-      return { next: branch.next, trustDelta: branch.trustDelta };
+      return { next: branch.next, trustDelta: branch.trustDelta, flag: branch.flag };
     }
   }
   return node.freeText.fallback;

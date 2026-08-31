@@ -1,8 +1,9 @@
 import Phaser from "phaser";
 import { BootScene } from "./scenes/BootScene";
-import { FieldScene } from "./scenes/FieldScene";
+import { RegionScene } from "./scenes/RegionScene";
 import { StatusOverlayScene } from "./scenes/StatusOverlayScene";
 import { DialogueScene } from "./scenes/DialogueScene";
+import { EndingScene } from "./scenes/EndingScene";
 
 const config: Phaser.Types.Core.GameConfig = {
   type: Phaser.AUTO,
@@ -20,7 +21,7 @@ const config: Phaser.Types.Core.GameConfig = {
     default: "arcade",
     arcade: { debug: false },
   },
-  scene: [BootScene, FieldScene, StatusOverlayScene, DialogueScene],
+  scene: [BootScene, RegionScene, StatusOverlayScene, DialogueScene, EndingScene],
 };
 
 new Phaser.Game(config);

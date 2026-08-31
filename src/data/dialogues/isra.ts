@@ -6,6 +6,7 @@ import type { DialogueTree } from "../../systems/DialogueSystem";
  */
 export const israDialogue: DialogueTree = {
   npcId: "isra",
+  crestColor: 0x4c6e5c, // 생(生) 계통
   startNode: "greet",
   nodes: {
     greet: {

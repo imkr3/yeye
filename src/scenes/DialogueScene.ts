@@ -8,6 +8,7 @@ import {
 export interface DialogueSceneData {
   tree: DialogueTree;
   onTrustDelta: (npcId: string, delta: number) => void;
+  onFlag?: (flag: string) => void;
   onClose: () => void;
 }
 
@@ -33,6 +34,10 @@ export class DialogueScene extends Phaser.Scene {
 
   create() {
     this.add.rectangle(480, 460, 860, 220, 0x0e0c09, 0.92).setStrokeStyle(1, 0x3a3225);
+
+    // 문장(紋章) — 계통색 원. 08번 섹션 비주얼 디렉션 참고.
+    this.add.circle(64, 386, 8, this.dialogueData.tree.crestColor).setStrokeStyle(1, 0xe8e1cd);
+
     this.speakerText = this.add.text(80, 380, "", {
       fontFamily: "monospace",
       fontSize: "12px",
@@ -83,6 +88,7 @@ export class DialogueScene extends Phaser.Scene {
         }).setInteractive({ useHandCursor: true });
         btn.on("pointerdown", () => {
           if (choice.trustDelta) this.dialogueData.onTrustDelta(this.dialogueData.tree.npcId, choice.trustDelta);
+          if (choice.flag) this.dialogueData.onFlag?.(choice.flag);
           this.currentNodeId = choice.next;
           this.renderNode();
         });
@@ -139,6 +145,7 @@ export class DialogueScene extends Phaser.Scene {
       if (!value) return;
       const result = evaluateFreeText(value, node);
       if (result.trustDelta) this.dialogueData.onTrustDelta(this.dialogueData.tree.npcId, result.trustDelta);
+      if (result.flag) this.dialogueData.onFlag?.(result.flag);
       this.currentNodeId = result.next;
       this.renderNode();
     };

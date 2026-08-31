@@ -1,9 +1,10 @@
 import Phaser from "phaser";
 import type { RegressionState } from "../systems/RegressionSystem";
+import { getState, gameEvents } from "../state/gameState";
 
 /**
  * 무한 서약 상태창 오버레이. 설계 문서 01.1 "초기 상태창" 참고.
- * FieldScene이 방출하는 regression-updated 이벤트를 구독해 갱신한다.
+ * 전역 게임 상태(gameState)의 regression-updated 이벤트를 구독해 갱신한다.
  */
 export class StatusOverlayScene extends Phaser.Scene {
   private text!: Phaser.GameObjects.Text;
@@ -27,9 +28,10 @@ export class StatusOverlayScene extends Phaser.Scene {
 
     this.flash = this.add.rectangle(480, 300, 960, 600, 0x7c1f2b, 0).setDepth(100);
 
-    const field = this.scene.get("FieldScene");
-    field.events.on("regression-updated", (state: RegressionState) => this.render(state));
-    field.events.on("death-flash", () => this.playDeathFlash());
+    gameEvents.on("regression-updated", (state: RegressionState) => this.render(state));
+    gameEvents.on("death-flash", () => this.playDeathFlash());
+
+    this.render(getState());
   }
 
   private render(state: RegressionState) {
