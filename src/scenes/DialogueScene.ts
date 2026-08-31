@@ -36,8 +36,14 @@ export class DialogueScene extends Phaser.Scene {
   create() {
     this.add.rectangle(480, 460, 860, 220, 0x0e0c09, 0.92).setStrokeStyle(1, 0x3a3225);
 
-    // 문장(紋章) — 필드 실루엣과 같은 모양을 재사용해 일관성을 유지한다.
-    drawCrest(this, 56, 386, 14, this.dialogueData.tree.crestColor, this.dialogueData.tree.crestShape);
+    // 문장(紋章) — 필드 실루엣과 같은 모양을 재사용해 일관성을 유지한다. 은은한 후광을 뒤에 깐다.
+    const crestColor = this.dialogueData.tree.crestColor;
+    const glow = this.add.graphics();
+    glow.fillStyle(crestColor, 0.12);
+    glow.fillCircle(56, 386, 26);
+    glow.fillStyle(crestColor, 0.18);
+    glow.fillCircle(56, 386, 18);
+    drawCrest(this, 56, 386, 14, crestColor, this.dialogueData.tree.crestShape);
 
     this.speakerText = this.add.text(80, 380, "", {
       fontFamily: "monospace",

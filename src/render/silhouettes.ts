@@ -2,15 +2,14 @@ import Phaser from "phaser";
 
 /**
  * 문장(紋章) 기반 실루엣 렌더러 — 설계 문서 08번 섹션 "비주얼 디렉션" 참고.
- * 초상화 대신, 계통색 + 기하학적 문장으로 캐릭터를 구분한다.
- * 필드 스프라이트와 대화창 아이콘이 같은 함수를 공유해 일관성을 유지한다.
+ * 초상화 대신, 후드 로브 실루엣 + 계통색 림라이트 + 문장으로 캐릭터를 구분한다.
+ * 필드 스프라이트와 대화창 초상 아이콘이 같은 함수를 공유해 일관성을 유지한다.
  */
 
 export type CrestShape = "dual-ring" | "leaf" | "diamond" | "triangle" | "zigzag";
 
 /**
  * 문장 하나를 Graphics로 그린다. (cx, cy) 중심, radius는 대략적인 반지름.
- * 반환값은 계속 재사용할 수 있는 Graphics 오브젝트.
  */
 export function drawCrest(
   scene: Phaser.Scene,
@@ -90,7 +89,8 @@ export function drawCrest(
 }
 
 /**
- * 필드 위 캐릭터 실루엣. 몸통(둥근 사각) + drawCrest 문장 하이라이트.
+ * 필드 위 캐릭터 실루엣 — 후드 로브 형태 + 부드러운 계통색 글로우 + 림라이트.
+ * bodyRadius 기준으로 전체 비례를 잡는다.
  */
 export function drawFieldSilhouette(
   scene: Phaser.Scene,
@@ -100,14 +100,64 @@ export function drawFieldSilhouette(
   shape: CrestShape,
   bodyRadius = 14
 ): Phaser.GameObjects.Container {
-  const body = scene.add.graphics();
-  body.fillStyle(0x1a1712, 1);
-  body.fillRoundedRect(-bodyRadius * 0.75, -bodyRadius * 1.3, bodyRadius * 1.5, bodyRadius * 2.2, bodyRadius * 0.5);
-  body.lineStyle(2, color, 0.9);
-  body.strokeRoundedRect(-bodyRadius * 0.75, -bodyRadius * 1.3, bodyRadius * 1.5, bodyRadius * 2.2, bodyRadius * 0.5);
+  const parts: Phaser.GameObjects.GameObject[] = [];
 
-  const crest = drawCrest(scene, 0, -bodyRadius * 0.55, bodyRadius * 0.5, color, shape);
+  // 1. 부드러운 글로우 — 반투명 원을 겹쳐 은은한 후광 효과를 낸다.
+  const glow = scene.add.graphics();
+  glow.fillStyle(color, 0.06);
+  glow.fillCircle(0, -bodyRadius * 0.2, bodyRadius * 2.4);
+  glow.fillStyle(color, 0.1);
+  glow.fillCircle(0, -bodyRadius * 0.2, bodyRadius * 1.7);
+  parts.push(glow);
 
-  const container = scene.add.container(x, y, [body, crest]);
+  // 2. 로브 몸통 — 어깨에서 밑단으로 퍼지는 사다리꼴 + 부드러운 밑단 곡선
+  const robe = scene.add.graphics();
+  robe.fillStyle(0x14110d, 1);
+  robe.lineStyle(2, color, 0.85);
+  const shoulderW = bodyRadius * 0.85;
+  const hemW = bodyRadius * 1.35;
+  const topY = -bodyRadius * 0.75;
+  const hemY = bodyRadius * 1.35;
+  robe.beginPath();
+  robe.moveTo(-shoulderW, topY);
+  robe.lineTo(shoulderW, topY);
+  robe.lineTo(hemW, hemY);
+  robe.lineTo(hemW * 0.55, hemY - bodyRadius * 0.18);
+  robe.lineTo(0, hemY);
+  robe.lineTo(-hemW * 0.55, hemY - bodyRadius * 0.18);
+  robe.lineTo(-hemW, hemY);
+  robe.closePath();
+  robe.fillPath();
+  robe.strokePath();
+  parts.push(robe);
+
+  // 3. 후드 — 머리를 감싸는 원, 안쪽은 그림자
+  const hood = scene.add.graphics();
+  hood.fillStyle(0x0c0a08, 1);
+  hood.fillCircle(0, -bodyRadius * 0.95, bodyRadius * 0.62);
+  hood.lineStyle(1.5, color, 0.7);
+  hood.strokeCircle(0, -bodyRadius * 0.95, bodyRadius * 0.62);
+  parts.push(hood);
+
+  // 4. 문장 — 가슴팍에 계통 상징을 새긴다.
+  const crest = drawCrest(scene, 0, bodyRadius * 0.15, bodyRadius * 0.4, color, shape);
+  parts.push(crest);
+
+  const container = scene.add.container(x, y, parts);
   return container;
+}
+
+/**
+ * 가만히 있을 때 살아있는 느낌을 주는 미세한 들숨/날숨 애니메이션.
+ * 이동 중인 플레이어에는 걷기 바운스를 따로 적용하므로 NPC에만 쓴다.
+ */
+export function addIdleBreath(scene: Phaser.Scene, target: Phaser.GameObjects.Container) {
+  scene.tweens.add({
+    targets: target,
+    scaleY: 1.035,
+    duration: 1600 + Math.random() * 400,
+    yoyo: true,
+    repeat: -1,
+    ease: "Sine.InOut",
+  });
 }

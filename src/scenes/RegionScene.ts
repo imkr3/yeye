@@ -11,7 +11,7 @@ import {
 import type { DialogueSceneData } from "./DialogueScene";
 import type { CombatSceneData } from "./CombatScene";
 import { paintRegionBackground, type BackgroundStyle } from "../render/backgrounds";
-import { drawFieldSilhouette } from "../render/silhouettes";
+import { drawFieldSilhouette, addIdleBreath } from "../render/silhouettes";
 
 /**
  * 지역 하나를 표현하는 재사용 가능한 씬. data/regions.ts의 설정을 읽어
@@ -47,7 +47,7 @@ export class RegionScene extends Phaser.Scene {
       "dual-ring"
     );
     this.physics.add.existing(this.player);
-    (this.player.body as Phaser.Physics.Arcade.Body).setCircle(14, -14, -20);
+    (this.player.body as Phaser.Physics.Arcade.Body).setCircle(14, -14, -14);
     this.cursors = this.input.keyboard!.createCursorKeys();
 
     if (this.config.hazard) {
@@ -95,7 +95,8 @@ export class RegionScene extends Phaser.Scene {
     this.config.npcs.forEach((npc) => {
       const npcSilhouette = drawFieldSilhouette(this, npc.x, npc.y, npc.color, npc.shape, 12);
       this.physics.add.existing(npcSilhouette, true);
-      (npcSilhouette.body as Phaser.Physics.Arcade.Body).setCircle(12, -12, -17);
+      (npcSilhouette.body as Phaser.Physics.Arcade.Body).setCircle(12, -12, -12);
+      addIdleBreath(this, npcSilhouette);
       this.add.text(npc.x, npc.y + 22, npc.label, { fontSize: "11px", color: "#cbbfa5" }).setOrigin(0.5);
       this.physics.add.overlap(this.player, npcSilhouette as unknown as Phaser.GameObjects.GameObject, () => {
         this.openDialogue(npc);
