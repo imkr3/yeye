@@ -2,7 +2,7 @@ import { CONSUMABLE_POOL } from "../data/items/consumables";
 import { RELIC_POOL } from "../data/items/relics";
 import { RARITY_WEIGHT, type ConsumableItem, type Rarity, type RelicItem } from "./GachaSystem";
 import { schoolOf, type School } from "../data/economy/schools";
-import { relicModifiers } from "./EffectRegistry";
+import { MARKET_TIPOFF_FLAG, TIPOFF_DISCOUNT, relicModifiers } from "./EffectRegistry";
 import {
   addConsumable,
   addDust,
@@ -92,7 +92,11 @@ export function pullOnce(
   rng: Rng,
   bias: School | null = null
 ): { result: PullResult; state: RegressionState } {
-  const pityDue = state.gachaPity.sinceHighRarity >= PITY_THRESHOLD;
+  const threshold = Math.max(
+    3,
+    PITY_THRESHOLD - relicModifiers(state.equippedRelics).pityReduction
+  );
+  const pityDue = state.gachaPity.sinceHighRarity >= threshold;
 
   const item =
     kind === "consumable"
@@ -107,7 +111,9 @@ export function pullOnce(
     // 이미 가진 유물은 자동으로 여진 가루로 환원된다.
     duplicate = state.inventory.relics.includes(item.id);
     if (duplicate) {
-      dustGained = DUPLICATE_DUST[item.rarity];
+      dustGained = Math.round(
+        DUPLICATE_DUST[item.rarity] * relicModifiers(state.equippedRelics).dustMultiplier
+      );
       next = addDust(next, dustGained);
     } else {
       next = addRelic(next, item.id);
@@ -149,8 +155,16 @@ export function pullFive(
 
 /** 유물 가격 — 장착한 유물의 할인이 반영된다. */
 export function priceFor(base: number, state: RegressionState): number {
+  // 유물 할인과 시세표 할인은 곱해서 겹친다 — 더해서 공짜가 되는 일은 없도록.
   const discount = relicModifiers(state.equippedRelics).shopDiscount;
-  return Math.max(1, Math.round(base * (1 - discount)));
+  const tipoff = state.storyFlags.includes(MARKET_TIPOFF_FLAG) ? TIPOFF_DISCOUNT : 0;
+  return Math.max(1, Math.round(base * (1 - discount) * (1 - tipoff)));
+}
+
+/** 구매가 성사되면 시세표는 한 번 쓰고 사라진다. */
+export function consumeMarketTipoff(state: RegressionState): RegressionState {
+  if (!state.storyFlags.includes(MARKET_TIPOFF_FLAG)) return state;
+  return { ...state, storyFlags: state.storyFlags.filter((f) => f !== MARKET_TIPOFF_FLAG) };
 }
 
 export function canAfford(state: RegressionState, price: number): boolean {

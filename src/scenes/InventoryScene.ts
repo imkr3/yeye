@@ -9,6 +9,7 @@ import {
   consumableEffectNote,
   consumableHasCombatUse,
   consumableHasFieldUse,
+  fieldUseMessage,
   relicEffectNote,
 } from "../systems/EffectRegistry";
 import { SCHOOL_COLOR, SCHOOL_LABEL, schoolOf } from "../data/economy/schools";
@@ -184,8 +185,10 @@ export class InventoryScene extends Phaser.Scene {
       let bx = 456;
       if (consumableHasFieldUse(row.item.id)) {
         this.button(bx, y, "[사용]", "#d1616c", () => {
+          // 문구는 상태가 바뀌기 전 값으로 계산한다 (예: 나침반이 가리키는 분기점 이름).
+          const report = fieldUseMessage(getState(), row.item.id);
           setState(applyFieldConsumable(getState(), row.item.id));
-          this.notice = `${row.item.name}을(를) 사용했다.`;
+          this.notice = report ?? `${row.item.name}을(를) 사용했다.`;
           this.render();
         });
         bx -= 46;

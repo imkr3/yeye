@@ -285,6 +285,14 @@ function dealToPlayer(state: CombatState, rawAmount: number, kind: ActionKind) {
     const posturePenalty = Math.max(0, state.player.consecutiveGuards - 1) * GUARD.postureLossPerRepeat;
     const effective = Math.max(0, Math.min(0.9, base + state.modifiers.guardBonus - posturePenalty));
     amount = amount * (1 - effective);
+
+    // 「되받는 목갑」류 — 막아낸 순간에만 되돌린다. 방어를 반복하면 자세가 무너지므로
+    // 무한 반격 루프는 posturePenalty가 막는다.
+    if (state.modifiers.guardCounter > 0) {
+      const back = state.modifiers.guardCounter;
+      state.enemy.hp = Math.max(0, state.enemy.hp - back);
+      state.record.damageDealt += back;
+    }
   }
 
   // 적이 남긴 표식이 있으면 폭발 계열이 증폭된다.
@@ -310,7 +318,9 @@ function dealToPlayer(state: CombatState, rawAmount: number, kind: ActionKind) {
 
 function applyStain(state: CombatState, delta: number, startedFlag?: { started: boolean }) {
   const before = state.player.stain;
-  state.player.stain = addStain(state.player.stain, delta);
+  // 저항은 얼룩이 오를 때만 걸린다 — 씻어내는 쪽까지 줄이면 손해가 된다.
+  const scaled = delta > 0 ? delta * state.modifiers.stainMultiplier : delta;
+  state.player.stain = addStain(state.player.stain, scaled);
   if (state.player.stain > before) {
     state.fragmentsEarned += state.modifiers.fragmentsOnStain;
   }

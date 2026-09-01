@@ -5,6 +5,7 @@ import {
   PITY_THRESHOLD,
   PRICES,
   canAfford,
+  consumeMarketTipoff,
   priceFor,
   pullFive,
   pullOnce,
@@ -12,6 +13,7 @@ import {
   type PullKind,
   type PullResult,
 } from "../systems/EconomySystem";
+import { MARKET_TIPOFF_FLAG } from "../systems/EffectRegistry";
 import { SCHOOL_COLOR, SCHOOL_LABEL, schoolOf, type School } from "../data/economy/schools";
 import { RARITY_COLOR } from "../systems/GachaSystem";
 import { addCoins } from "../systems/RegressionSystem";
@@ -296,15 +298,16 @@ export class ExchangeScene extends Phaser.Scene {
     const state = getState();
     const singlePrice = priceFor(PRICES.singlePull, state);
     const fivePrice = priceFor(PRICES.fivePull, state);
+    const tipoff = state.storyFlags.includes(MARKET_TIPOFF_FLAG) ? " ·시세표" : "";
 
     const opts: { label: string; act: () => void; disabled?: boolean }[] = [
       {
-        label: `${this.kind === "relic" ? "유물" : "소모품"} 단일 뽑기 (여진화 ${singlePrice})`,
+        label: `${this.kind === "relic" ? "유물" : "소모품"} 단일 뽑기 (여진화 ${singlePrice}${tipoff})`,
         act: () => this.doPull(1, singlePrice),
         disabled: !canAfford(state, singlePrice),
       },
       {
-        label: `${this.kind === "relic" ? "유물" : "소모품"} 5연속 (여진화 ${fivePrice})`,
+        label: `${this.kind === "relic" ? "유물" : "소모품"} 5연속 (여진화 ${fivePrice}${tipoff})`,
         act: () => this.doPull(5, fivePrice),
         disabled: !canAfford(state, fivePrice),
       },
@@ -382,7 +385,8 @@ export class ExchangeScene extends Phaser.Scene {
     if (!canAfford(state, price)) return;
 
     const rng = createRng(`${state.runSeed}:pull:${state.gachaHistory.length}:${count}`);
-    const paid = addCoins(state, -price);
+    // 시세표를 봤다면 이 거래에서 소모된다 — 할인은 price에 이미 반영되어 있다.
+    const paid = consumeMarketTipoff(addCoins(state, -price));
 
     if (count === 1) {
       const { result, state: next } = pullOnce(paid, this.kind, rng, this.bias);

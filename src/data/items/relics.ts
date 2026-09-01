@@ -34,4 +34,27 @@ export const RELIC_POOL: RelicItem[] = [
   { id: "double-vow-seal", name: "서약의 이중 인장", rarity: "SSR", flavor: "세계가 한 사람에게 두 번 거래를 허락하는 일은 드물다.", trait: "서약을 하나 더 맺을 수 있게 된다." },
   { id: "residue-necklace", name: "잔재의 목걸이", rarity: "SSR", flavor: "목에 걸면 균열 안쪽 공기가 조금 옅어진 것처럼 느껴진다.", trait: "심도 3 이상 균열의 환로를 미리 이용할 수 있다." },
   { id: "stairwell-shadow", name: "계단의 그림자", rarity: "SSR", flavor: "모른조차 이 그림자의 정체는 모른다고 했다.", trait: "죽음의 기억이 첫 방문에도 발동한다." },
+
+  // === 2차 배치 =============================================================
+  // --- C ---
+  { id: "chipped-gorget", name: "이 빠진 목갑", rarity: "C", flavor: "막아낸 자국마다 이가 하나씩 나갔다.", trait: "방어에 성공하면 소량의 피해를 되돌린다." },
+  { id: "ash-dusted-pouch", name: "재 묻은 주머니", rarity: "C", flavor: "털어도 재가 계속 나온다.", trait: "중복 환원으로 받는 여진 가루가 늘어난다." },
+  { id: "riverstone-charm", name: "강돌 부적", rarity: "C", flavor: "물살이 오래 다듬은 것은 잘 얼룩지지 않는다.", trait: "얼룩이 번지는 속도가 조금 느려진다." },
+
+  // --- UC ---
+  { id: "salt-lined-cloak", name: "소금 덧댄 외투", rarity: "UC", flavor: "안감을 뜯으면 소금이 쏟아진다.", trait: "얼룩이 번지는 속도가 느려진다." },
+  { id: "hollow-lantern", name: "속 빈 등불", rarity: "UC", flavor: "심지가 없는데도 꺼지지 않는다.", trait: "균열 안에서의 회복량이 늘어난다." },
+  { id: "counterweight-ring", name: "균형추 고리", rarity: "UC", flavor: "한쪽이 눌리면 반드시 다른 쪽이 올라온다.", trait: "방어에 성공하면 되돌리는 피해가 늘어난다." },
+
+  // --- R ---
+  { id: "vein-glass-monocle", name: "유리맥 단안경", rarity: "R", flavor: "지하도의 결을 그대로 살려 깎았다.", trait: "환로의 천장이 더 빨리 찾아온다." },
+  { id: "dust-sifters-sieve", name: "가루 체", rarity: "R", flavor: "재의 시장에서 제일 잘 팔리는 물건.", trait: "중복 환원으로 받는 여진 가루가 크게 늘어난다." },
+  { id: "tidewalkers-tabi", name: "물때 걸음신", rarity: "R", flavor: "젖은 바닥에서 오히려 발이 잘 붙는다.", trait: "이동이 빨라지고 균열 안에서 더 회복한다." },
+
+  // --- SR ---
+  { id: "unstained-veil", name: "얼룩 없는 면사", rarity: "SR", flavor: "여태 한 번도 더러워진 적이 없다는 것이 이 천의 유일한 내력이다.", trait: "얼룩이 번지는 속도가 크게 느려진다." },
+  { id: "returned-favor-pin", name: "되갚은 호의 핀", rarity: "SR", flavor: "받은 쪽이 아니라 갚은 쪽이 지니는 물건이다.", trait: "방어에 성공하면 큰 피해를 되돌린다." },
+
+  // --- SSR ---
+  { id: "ledger-of-small-mercies", name: "작은 자비의 장부", rarity: "SSR", flavor: "큰 선행은 한 줄도 없다. 사소한 것만 빼곡하다.", trait: "회복량과 균열 회복, 여진 가루 환원이 모두 늘어난다." },
 ];

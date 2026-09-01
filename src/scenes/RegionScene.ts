@@ -20,7 +20,7 @@ import type { DialogueSceneData } from "./DialogueScene";
 import type { CombatSceneData } from "./CombatScene";
 import { RIFT_ENEMIES } from "../data/rifts/enemies";
 import { PLAYER_BASE } from "../data/combat/balance";
-import { relicModifiers } from "../systems/EffectRegistry";
+import { COMPASS_FLAG, relicModifiers } from "../systems/EffectRegistry";
 import { paintScenery, type SceneryStyle } from "../render/scenery";
 import { drawVolumetricCharacter, addIdleFloat } from "../render/volumetric";
 
@@ -44,6 +44,8 @@ export class RegionScene extends Phaser.Scene {
   private facing: 1 | -1 = 1;
   private enteringRift = false;
   private exchangeOpen = false;
+  /** 「낡은 나침반」이 켜져 있을 때만 존재하는 화면 고정 바늘. */
+  private compass: Phaser.GameObjects.Container | null = null;
 
   constructor() {
     super("RegionScene");
@@ -56,6 +58,7 @@ export class RegionScene extends Phaser.Scene {
     this.facing = 1;
     this.enteringRift = false;
     this.exchangeOpen = false;
+    this.compass = null;
   }
 
   create() {
@@ -138,6 +141,8 @@ export class RegionScene extends Phaser.Scene {
         markNearSavePoint();
         this.onReachSavePoint();
       });
+
+      if (getState().storyFlags.includes(COMPASS_FLAG)) this.createCompass();
 
       if (this.config.nextRegionKey) {
         const exitX = isSidescroll ? worldWidth - 40 : 920;
@@ -296,6 +301,40 @@ export class RegionScene extends Phaser.Scene {
     } else {
       this.updateTopdown(body, time);
     }
+
+    this.updateCompass();
+  }
+
+  // --- 낡은 나침반 --------------------------------------------------------
+
+  /**
+   * 분기점 방향을 가리키는 화면 고정 바늘. 지역을 벗어나면 사라진다 —
+   * 소모품 하나가 영구 편의가 되어버리지 않도록.
+   */
+  private createCompass() {
+    const ring = this.add.circle(0, 0, 17, 0x100e14, 0.78).setStrokeStyle(1.5, 0x6ea78c, 0.7);
+    const needle = this.add.triangle(0, 0, 0, -12, 4.5, 5, -4.5, 5, 0x8fbfa4);
+    const tail = this.add.triangle(0, 0, 0, 12, 3, -4, -3, -4, 0x3a3348);
+    const dial = this.add.container(0, 0, [tail, needle]);
+    this.compass = this.add
+      .container(900, 60, [ring, dial])
+      .setScrollFactor(0)
+      .setDepth(60);
+    this.compass.setData("dial", dial);
+    this.add
+      .text(900, 84, "분기점", { fontFamily: "monospace", fontSize: "9px", color: "#6ea78c" })
+      .setOrigin(0.5)
+      .setScrollFactor(0)
+      .setDepth(60);
+  }
+
+  private updateCompass() {
+    const sp = this.config.savePoint;
+    if (!this.compass || !sp) return;
+    const dial = this.compass.getData("dial") as Phaser.GameObjects.Container;
+    const angle = Phaser.Math.Angle.Between(this.player.x, this.player.y, sp.x, sp.y);
+    // 삼각형이 위를 향하도록 그려져 있으므로 90도만큼 되돌린다.
+    dial.rotation = Phaser.Math.Angle.RotateTo(dial.rotation, angle + Math.PI / 2, 0.12);
   }
 
   private updateTopdown(body: Phaser.Physics.Arcade.Body, time: number) {
@@ -457,6 +496,11 @@ export class RegionScene extends Phaser.Scene {
     const sp = this.config.savePoint;
     if (!sp || getState().currentSavePoint.id !== sp.id) return; // 분기점 갱신 전엔 못 넘어간다
     if (!this.config.nextRegionKey) return;
+    // 나침반은 이 지역에서만 유효하다 — 넘어가기 전에 끈다.
+    const state = getState();
+    if (state.storyFlags.includes(COMPASS_FLAG)) {
+      setState({ ...state, storyFlags: state.storyFlags.filter((f) => f !== COMPASS_FLAG) });
+    }
     this.scene.start("RegionScene", { regionKey: this.config.nextRegionKey });
   }
 

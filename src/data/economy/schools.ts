@@ -66,6 +66,34 @@ const ITEM_SCHOOLS: Record<string, School> = {
   "double-vow-seal": "sanctity",
   "residue-necklace": "ruin",
   "stairwell-shadow": "none",
+
+  // --- 2차 배치 · 소모품 ---
+  "cracked-whetstone": "ruin",
+  "salt-wrapped-bandage": "life",
+  "riverbed-pebble": "sanctity",
+  "tin-whistle": "bond",
+  "anchor-chalk": "life",
+  "seconds-thief": "ruin",
+  "vein-glass-lens": "bond",
+  "helgas-coolant": "sanctity",
+  "rivs-ledger-page": "bond",
+  "isras-spare-key": "bond",
+  "counterflow-vial": "ruin",
+  "morens-blank-page": "none",
+
+  // --- 2차 배치 · 유물 ---
+  "chipped-gorget": "sanctity",
+  "ash-dusted-pouch": "bond",
+  "riverstone-charm": "life",
+  "salt-lined-cloak": "life",
+  "hollow-lantern": "sanctity",
+  "counterweight-ring": "ruin",
+  "vein-glass-monocle": "bond",
+  "dust-sifters-sieve": "bond",
+  "tidewalkers-tabi": "life",
+  "unstained-veil": "sanctity",
+  "returned-favor-pin": "bond",
+  "ledger-of-small-mercies": "sanctity",
 };
 
 export function schoolOf(itemId: string): School {

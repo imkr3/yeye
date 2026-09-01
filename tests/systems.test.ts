@@ -43,9 +43,17 @@ import {
   applyFieldConsumable,
   consumableHasRiftUse,
   riftUseEffect,
+  fieldUseMessage,
+  consumableHasAnyEffect,
+  COMPASS_FLAG,
+  MARKET_TIPOFF_FLAG,
+  relicHasEffect,
 } from "../src/systems/EffectRegistry";
 import { resolveEnding } from "../src/systems/EndingSystem";
-import { pullOnce, pullFive, PITY_THRESHOLD, DUPLICATE_DUST, rarityOdds } from "../src/systems/EconomySystem";
+import { pullOnce, pullFive, PITY_THRESHOLD, DUPLICATE_DUST, rarityOdds, priceFor, consumeMarketTipoff, PRICES } from "../src/systems/EconomySystem";
+import { CONSUMABLE_POOL } from "../src/data/items/consumables";
+import { RELIC_POOL } from "../src/data/items/relics";
+import { schoolOf } from "../src/data/economy/schools";
 import { PULSE_COUNTER, GLASS_MITE, SUTURED_PILGRIM, BACKFLOW_HOUND } from "../src/data/rifts/enemies";
 import { RELIC_POOL } from "../src/data/items/relics";
 
@@ -432,6 +440,79 @@ const withoutRelic = resolveEnding(endingState);
 const withRelic = resolveEnding({ ...endingState, equippedRelics: ["unspoken-name-fragment"] });
 check("가산점 없이는 트루엔딩에 못 닿는다", withoutRelic.id !== "unspoken-name");
 check("가산 유물이 트루엔딩 판정을 밀어준다", withRelic.id === "unspoken-name");
+
+// ---------------------------------------------------------------------------
+section("14. 정보형 소모품(나침반·전단지)이 실제로 무언가를 바꾼다");
+
+// 모든 소모품에 효과가 붙어 있어야 한다 — 설명만 있는 아이템을 남기지 않는다.
+const effectless = CONSUMABLE_POOL.filter((i) => !consumableHasAnyEffect(i.id)).map((i) => i.id);
+check("설명만 있고 효과가 없는 소모품이 없다", effectless.length === 0, effectless.join(", "));
+
+let compassState = fresh();
+compassState = { ...compassState, inventory: { consumables: ["worn-compass"], relics: [] } };
+const compassNote = fieldUseMessage(compassState, "worn-compass");
+check(
+  "나침반 문구가 현재 분기점 이름을 담는다",
+  !!compassNote && compassNote.includes(compassState.currentSavePoint.label),
+  compassNote ?? "(없음)"
+);
+const compassUsed = applyFieldConsumable(compassState, "worn-compass");
+check("나침반이 방향 표시를 켠다", compassUsed.storyFlags.includes(COMPASS_FLAG));
+check("나침반도 사용하면 소모된다", compassUsed.inventory.consumables.length === 0);
+
+let flyerState = fresh();
+flyerState = { ...flyerState, inventory: { consumables: ["folded-flyer"], relics: [] } };
+const basePrice = priceFor(PRICES.singlePull, flyerState);
+const flyerUsed = applyFieldConsumable(flyerState, "folded-flyer");
+const cheapPrice = priceFor(PRICES.singlePull, flyerUsed);
+check("전단지가 다음 구매 값을 깎는다", cheapPrice < basePrice, `${basePrice} → ${cheapPrice}`);
+const afterPurchase = consumeMarketTipoff(flyerUsed);
+check("시세표는 한 번 쓰면 사라진다", !afterPurchase.storyFlags.includes(MARKET_TIPOFF_FLAG));
+check("할인이 다음 거래로 이어지지 않는다", priceFor(PRICES.singlePull, afterPurchase) === basePrice);
+check("할인이 값을 0 아래로 떨어뜨리지 않는다", priceFor(1, flyerUsed) >= 1);
+
+// ---------------------------------------------------------------------------
+section("15. 2차 배치 아이템이 전부 실제 효과와 계통을 갖는다");
+
+const relicless = RELIC_POOL.filter((i) => !relicHasEffect(i.id)).map((i) => i.id);
+check("효과가 없는 유물이 없다", relicless.length === 0, relicless.join(", "));
+
+const dupIds = [...CONSUMABLE_POOL, ...RELIC_POOL].map((i) => i.id);
+check("아이템 ID가 전부 고유하다", new Set(dupIds).size === dupIds.length);
+
+const unschooled = [...CONSUMABLE_POOL, ...RELIC_POOL].filter(
+  (i) => schoolOf(i.id) === "none" && !["damp-matches", "ash-bead-necklace", "worn-wristwatch", "morens-old-footprint", "stairwell-shadow", "morens-blank-page"].includes(i.id)
+).map((i) => i.id);
+check("계통 분류가 빠진 아이템이 없다", unschooled.length === 0, unschooled.join(", "));
+
+// 새 수정치들이 실제로 계산에 반영되는지
+check("얼룩 저항이 곱해서 겹친다", Math.abs(relicModifiers(["riverstone-charm", "salt-lined-cloak"]).stainMultiplier - 0.72) < 1e-9);
+check("반격 피해는 더해서 겹친다", relicModifiers(["chipped-gorget", "counterweight-ring"]).guardCounter === 9);
+check("같은 유물을 두 번 넣어도 한 번만 적용된다", relicModifiers(["counterweight-ring", "counterweight-ring"]).guardCounter === 6);
+
+// 얼룩 저항이 전투에서 실제로 덜 오른다
+const stainy = createCombat({ enemy: GLASS_MITE, modifiers: relicModifiers([]) });
+const resisted = createCombat({ enemy: GLASS_MITE, modifiers: relicModifiers(["unstained-veil"]) });
+const plainAfter = takeTurn(stainy, { id: "sunder" }, createRng("stain-a"));
+const veilAfter = takeTurn(resisted, { id: "sunder" }, createRng("stain-a"));
+check("얼룩 없는 면사가 실제로 얼룩을 덜 쌓는다", veilAfter.player.stain < plainAfter.player.stain, `${plainAfter.player.stain} → ${veilAfter.player.stain}`);
+check("얼룩 저항이 얼룩을 음수로 만들지 않는다", veilAfter.player.stain >= 0);
+
+// 방어 반격이 방어했을 때만 나간다
+const counterState = createCombat({ enemy: GLASS_MITE, modifiers: relicModifiers(["returned-favor-pin"]) });
+const counterAfter = takeTurn(counterState, { id: "guard" }, createRng("counter"));
+check("방어 반격이 적 체력을 깎는다", counterAfter.enemy.hp < GLASS_MITE.maxHp);
+const noCounter = takeTurn(
+  createCombat({ enemy: GLASS_MITE, modifiers: relicModifiers([]) }),
+  { id: "guard" },
+  createRng("counter")
+);
+check("반격 유물이 없으면 방어만으로 피해가 없다", noCounter.enemy.hp === GLASS_MITE.maxHp);
+
+// 균열 회복 보너스
+check("균열 회복 보너스가 합산된다", relicModifiers(["hollow-lantern", "tidewalkers-tabi"]).riftHealBonus === 11);
+check("천장 단축이 합산된다", relicModifiers(["vein-glass-monocle"]).pityReduction === 2);
+check("가루 배율이 곱해진다", Math.abs(relicModifiers(["ash-dusted-pouch", "dust-sifters-sieve"]).dustMultiplier - 3) < 1e-9);
 
 // ---------------------------------------------------------------------------
 console.log(`\n${passed}개 통과, ${failed}개 실패`);

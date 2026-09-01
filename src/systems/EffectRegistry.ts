@@ -1,6 +1,19 @@
 import type { CombatState } from "./CombatSystem";
 import { addStain } from "./StainSystem";
-import { addWardCharge, removeConsumable, type RegressionState } from "./RegressionSystem";
+import {
+  addCoins,
+  addStoryFlag,
+  addWardCharge,
+  removeConsumable,
+  type RegressionState,
+} from "./RegressionSystem";
+
+/** 나침반이 켜져 있는 동안 지역 화면에 분기점 방향이 표시된다. */
+export const COMPASS_FLAG = "compass-active";
+/** 시세표를 본 상태 — 환로에서 한 번 값을 깎는다. */
+export const MARKET_TIPOFF_FLAG = "market-tipoff";
+/** 시세표 할인율. */
+export const TIPOFF_DISCOUNT = 0.15;
 
 /**
  * 아이템 효과 레지스트리.
@@ -51,6 +64,16 @@ export interface RelicModifiers {
   relicSlotBonus: number;
   /** 균열의 방 구성을 미리 보여준다 */
   revealRooms: boolean;
+  /** 얼룩이 오를 때 곱해지는 배율 (1 미만이면 저항) */
+  stainMultiplier: number;
+  /** 방어에 성공할 때 적에게 되돌리는 고정 피해 */
+  guardCounter: number;
+  /** 중복 환원으로 받는 여진 가루 배율 */
+  dustMultiplier: number;
+  /** 천장까지 필요한 횟수를 줄인다 */
+  pityReduction: number;
+  /** 균열 안의 회복에 더해지는 고정량 */
+  riftHealBonus: number;
 }
 
 export const NEUTRAL_MODIFIERS: RelicModifiers = {
@@ -71,6 +94,11 @@ export const NEUTRAL_MODIFIERS: RelicModifiers = {
   endingTrustBonus: 0,
   relicSlotBonus: 0,
   revealRooms: false,
+  stainMultiplier: 1,
+  guardCounter: 0,
+  dustMultiplier: 1,
+  pityReduction: 0,
+  riftHealBonus: 0,
 };
 
 type RelicModifier = (mods: RelicModifiers) => void;
@@ -197,6 +225,55 @@ const RELIC_EFFECTS: Record<string, { note: string; apply: RelicModifier }> = {
       m.shopDiscount = Math.min(0.6, m.shopDiscount + 0.1);
     },
   },
+  // --- 2차 배치 ---
+  "chipped-gorget": {
+    note: "방어 성공 시 3 피해를 되돌린다",
+    apply: (m) => { m.guardCounter += 3; },
+  },
+  "ash-dusted-pouch": {
+    note: "중복 환원 여진 가루 1.5배",
+    apply: (m) => { m.dustMultiplier *= 1.5; },
+  },
+  "riverstone-charm": {
+    note: "얼룩 상승 10% 감소",
+    apply: (m) => { m.stainMultiplier *= 0.9; },
+  },
+  "salt-lined-cloak": {
+    note: "얼룩 상승 20% 감소",
+    apply: (m) => { m.stainMultiplier *= 0.8; },
+  },
+  "hollow-lantern": {
+    note: "균열 회복 +4",
+    apply: (m) => { m.riftHealBonus += 4; },
+  },
+  "counterweight-ring": {
+    note: "방어 성공 시 6 피해를 되돌린다",
+    apply: (m) => { m.guardCounter += 6; },
+  },
+  "vein-glass-monocle": {
+    note: "천장까지 필요한 횟수 -2",
+    apply: (m) => { m.pityReduction += 2; },
+  },
+  "dust-sifters-sieve": {
+    note: "중복 환원 여진 가루 2배",
+    apply: (m) => { m.dustMultiplier *= 2; },
+  },
+  "tidewalkers-tabi": {
+    note: "이동 속도 +12%, 균열 회복 +7",
+    apply: (m) => { m.moveSpeedMultiplier *= 1.12; m.riftHealBonus += 7; },
+  },
+  "unstained-veil": {
+    note: "얼룩 상승 35% 감소",
+    apply: (m) => { m.stainMultiplier *= 0.65; },
+  },
+  "returned-favor-pin": {
+    note: "방어 성공 시 10 피해를 되돌린다",
+    apply: (m) => { m.guardCounter += 10; },
+  },
+  "ledger-of-small-mercies": {
+    note: "회복 +20%, 균열 회복 +10, 여진 가루 1.5배",
+    apply: (m) => { m.healingMultiplier *= 1.2; m.riftHealBonus += 10; m.dustMultiplier *= 1.5; },
+  },
 };
 
 export function relicHasEffect(itemId: string): boolean {
@@ -244,6 +321,8 @@ export interface ConsumableDefinition {
   field?: (state: RegressionState) => RegressionState;
   /** 균열 안에서 사용 가능 여부 — 방 구조에 개입한다 */
   rift?: () => RiftUseContext;
+  /** 필드 사용 시 화면에 남길 문구. 상태가 바뀌기 *전*의 상태로 계산한다. */
+  report?: (state: RegressionState) => string;
   note: string;
 }
 
@@ -359,9 +438,115 @@ const CONSUMABLE_EFFECTS: Record<string, ConsumableDefinition> = {
     note: "균열의 현재 방을 건너뛴다",
     rift: () => ({ skipRoom: true, message: "반투명 열쇠 — 없던 문이 열린다. 이 방은 지나간다." }),
   },
+  "worn-compass": {
+    note: "분기점 방향 표시를 켠다 (지역 이동 전까지)",
+    field: (state) => addStoryFlag(state, COMPASS_FLAG),
+    report: (state) =>
+      `낡은 나침반 — 바늘이 「${state.currentSavePoint.label}」 쪽으로 굳었다.`,
+  },
+  "folded-flyer": {
+    note: "다음 환로 구매를 15% 싸게 한다",
+    field: (state) => addStoryFlag(state, MARKET_TIPOFF_FLAG),
+    report: () => "접힌 전단지 — 오늘 시세를 외웠다. 다음 거래는 조금 싸게 부를 수 있다.",
+  },
   "unnamed-invitation": {
     note: "심층주 앞으로 곧장 간다",
     rift: () => ({ jumpToBoss: true, message: "이름 없는 자의 초대장 — 길이 접힌다. 최심부가 바로 앞이다." }),
+  },
+  // --- 2차 배치 ---
+  "cracked-whetstone": {
+    note: "반격당하지 않는 행동 1회",
+    combat: (state) => {
+      state.player.freeActions += 1;
+      return "금 간 숫돌 — 날을 세운다. 한 번은 먼저 움직일 수 있다.";
+    },
+  },
+  "salt-wrapped-bandage": {
+    note: "체력 12 회복, 얼룩 10 감소",
+    combat: (state, mods) => {
+      const healed = Math.round(12 * mods.healingMultiplier);
+      state.player.hp = Math.min(state.player.maxHp, state.player.hp + healed);
+      state.player.stain = addStain(state.player.stain, -10);
+      return `소금 감은 붕대 — 쓰라리지만 체력 ${healed} 회복.`;
+    },
+  },
+  "riverbed-pebble": {
+    note: "보호막 9 획득",
+    combat: (state) => {
+      state.player.shield += 9;
+      return "강바닥 조약돌 — 매끄러운 표면이 한 겹의 벽이 된다.";
+    },
+  },
+  "tin-whistle": {
+    note: "표식 해제, 방어 자세 회복",
+    combat: (state) => {
+      state.enemy.markedPlayer = false;
+      state.player.consecutiveGuards = 0;
+      return "양철 호루라기 — 소리에 표식이 흩어지고, 무너진 자세가 다시 선다.";
+    },
+  },
+  "anchor-chalk": {
+    note: "균열에서 체력 20 회복",
+    rift: () => ({ heal: 20, message: "정박지 분필 — 바닥에 그린 원 안에서 잠시 숨을 돌린다." }),
+  },
+  "seconds-thief": {
+    note: "반격당하지 않는 행동 2회",
+    combat: (state) => {
+      state.player.freeActions += 2;
+      return "초를 훔친 자 — 훔친 시간만큼 먼저 움직인다.";
+    },
+  },
+  "vein-glass-lens": {
+    note: "기억 단계 +2",
+    combat: (state) => {
+      state.memoryTier = Math.min(3, state.memoryTier + 2);
+      return "유리맥 렌즈 — 흐릿하던 박자가 두 겹 선명해진다.";
+    },
+  },
+  "helgas-coolant": {
+    note: "범람 즉시 종료, 얼룩 40 감소",
+    combat: (state) => {
+      const wasOverflowing = state.player.overflowTurnsLeft > 0;
+      state.player.overflowTurnsLeft = 0;
+      state.player.stain = addStain(state.player.stain, -40);
+      return wasOverflowing
+        ? "헬가의 냉각제 — 끓던 것이 단숨에 식는다. 범람이 멎었다."
+        : "헬가의 냉각제 — 번지던 얼룩이 차갑게 굳는다.";
+    },
+  },
+  "rivs-ledger-page": {
+    note: "여진화 45 획득",
+    field: (state) => addCoins(state, 45),
+    report: () => "리브의 장부 한 장 — 적힌 값만큼 여진화 45를 회수했다.",
+  },
+  "isras-spare-key": {
+    note: "균열의 현재 방을 건너뛰고 체력 14 회복",
+    rift: () => ({
+      skipRoom: true,
+      heal: 14,
+      message: "이스라의 여벌 열쇠 — 옆으로 난 길이 열린다. 이 방은 지나간다.",
+    }),
+  },
+  "counterflow-vial": {
+    note: "적 최대 체력의 30% 피해, 얼룩 26 증가",
+    combat: (state) => {
+      const dealt = Math.round(state.enemy.def.maxHp * 0.3);
+      state.enemy.hp = Math.max(0, state.enemy.hp - dealt);
+      state.record.damageDealt += dealt;
+      state.player.stain = addStain(state.player.stain, 26);
+      return `역류 유리병 — 흐름이 뒤집히며 ${dealt}의 피해. 얼룩이 크게 번진다.`;
+    },
+  },
+  "morens-blank-page": {
+    note: "얼룩·범람 제거, 보호막 20, 기억 3단계",
+    combat: (state) => {
+      state.player.stain = 0;
+      state.player.overflowTurnsLeft = 0;
+      state.player.shield += 20;
+      state.memoryTier = 3;
+      state.enemy.markedPlayer = false;
+      return "모른의 백지 — 이 장에는 아무것도 적히지 않는다. 얼룩도, 범람도.";
+    },
   },
 };
 
@@ -380,6 +565,11 @@ export function riftUseEffect(itemId: string): RiftUseContext | null {
 
 export function consumableHasFieldUse(itemId: string): boolean {
   return !!CONSUMABLE_EFFECTS[itemId]?.field;
+}
+
+/** 필드 사용 문구. 상태를 바꾸기 전에 호출해야 한다. */
+export function fieldUseMessage(state: RegressionState, itemId: string): string | null {
+  return CONSUMABLE_EFFECTS[itemId]?.report?.(state) ?? null;
 }
 
 export function consumableEffectNote(itemId: string): string | null {
