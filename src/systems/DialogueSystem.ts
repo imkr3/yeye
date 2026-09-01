@@ -7,8 +7,8 @@
  * 나중에 실제 LLM 판정으로 바꿔 끼울 수 있도록 분리해둔다.
  */
 
-export interface DialogueChoice {
-  label: string;
+/** 갈래 하나를 골랐을 때 벌어지는 일. 선택지·키워드·기본 갈래가 모두 공유한다. */
+export interface DialogueOutcome {
   next: string;
   trustDelta?: number;
   /** 엔딩 판정 등에 쓰이는 스토리 플래그. */
@@ -20,14 +20,13 @@ export interface DialogueChoice {
   lethal?: string;
 }
 
-export interface FreeTextBranch {
+export interface DialogueChoice extends DialogueOutcome {
+  label: string;
+}
+
+export interface FreeTextBranch extends DialogueOutcome {
   /** 이 중 하나라도 입력에 포함되면 이 분기로 이동 */
   keywords: string[];
-  next: string;
-  trustDelta?: number;
-  flag?: string;
-  /** 자유 입력으로도 죽을 수 있다 — 말해선 안 되는 것을 말했을 때. */
-  lethal?: string;
 }
 
 export interface DialogueNode {
@@ -40,7 +39,8 @@ export interface DialogueNode {
   freeText?: {
     prompt: string;
     branches: FreeTextBranch[];
-    fallback: { next: string; trustDelta?: number; flag?: string };
+    /** 어느 키워드에도 걸리지 않은 입력. 여기서도 죽을 수 있다 — 침묵이 정답인 상대. */
+    fallback: DialogueOutcome;
   };
   /** 분기 없이 다음으로 자동 진행 (대사 나열용) */
   next?: string;
@@ -51,6 +51,12 @@ export interface DialogueNode {
    * 답을 알려주지는 않되, 위험하다는 것 정도는 읽을 수 있어야 한다.
    */
   menace?: boolean;
+  /**
+   * 이 노드에 닿는 것만으로 세워지는 플래그. 선택지가 아니라 "도달했다"는 사실이
+   * 기록되어야 할 때 쓴다 — 위험한 상대에게서 살아 나온 기록 같은 것.
+   * 플래그 세우기는 멱등이므로 다시 방문해도 문제없다.
+   */
+  flagOnEnter?: string;
 }
 
 export interface DialogueTree {
@@ -76,7 +82,7 @@ export function getNode(tree: DialogueTree, nodeId: string): DialogueNode {
 export function evaluateFreeText(
   input: string,
   node: DialogueNode
-): { next: string; trustDelta?: number; flag?: string; lethal?: string } {
+): DialogueOutcome {
   if (!node.freeText) throw new Error("자유 입력 노드가 아닙니다.");
   const normalized = input.trim().toLowerCase();
 

@@ -64,6 +64,10 @@ import { rivDialogue } from "../src/data/dialogues/riv";
 import { helgaDialogue } from "../src/data/dialogues/helga";
 import { morenDialogue } from "../src/data/dialogues/moren";
 import { borrowedFaceDialogue } from "../src/data/dialogues/borrowed-face";
+import { countingMouthDialogue } from "../src/data/dialogues/counting-mouth";
+import { silentPilgrimDialogue } from "../src/data/dialogues/silent-pilgrim";
+import { ashBearerDialogue } from "../src/data/dialogues/ash-bearer";
+import { evaluateFreeText } from "../src/systems/DialogueSystem";
 import type { DialogueNode, DialogueTree } from "../src/systems/DialogueSystem";
 import { hazardClearance, canClearHazard, maxJumpRise, MIN_CLEARANCE_RATIO } from "../src/systems/Platforming";
 import { PULSE_COUNTER, GLASS_MITE, SUTURED_PILGRIM, BACKFLOW_HOUND } from "../src/data/rifts/enemies";
@@ -564,6 +568,9 @@ const ALL_TREES: [string, DialogueTree][] = [
   ["helga", helgaDialogue],
   ["moren", morenDialogue],
   ["borrowed-face", borrowedFaceDialogue],
+  ["counting-mouth", countingMouthDialogue],
+  ["silent-pilgrim", silentPilgrimDialogue],
+  ["ash-bearer", ashBearerDialogue],
 ];
 
 /** 한 노드에서 이어지는 모든 목적지 id. */
@@ -636,6 +643,79 @@ check("치명적 선택지에 사유 문구가 있다", lethalChoices.every((c) 
 const bfStart = borrowedFaceDialogue.nodes[borrowedFaceDialogue.startNode];
 const bfFirst = bfStart.choices ?? borrowedFaceDialogue.nodes[bfStart.next!]?.choices ?? [];
 check("빌린 얼굴: 첫 갈림길에 안전한 선택지가 있다", bfFirst.some((c) => !c.lethal));
+
+// ---------------------------------------------------------------------------
+section("17b. 위험한 대화 상대마다 죽는 방식과 살길이 다르다");
+
+/** 트리 전체에서 치명적인 갈래를 모은다 (선택지 + 키워드 + 기본 갈래). */
+function lethalsIn(tree: DialogueTree): string[] {
+  const out: string[] = [];
+  for (const n of Object.values(tree.nodes)) {
+    (n.choices ?? []).forEach((c) => c.lethal && out.push(c.lethal));
+    if (n.freeText) {
+      n.freeText.branches.forEach((b) => b.lethal && out.push(b.lethal));
+      if (n.freeText.fallback.lethal) out.push(n.freeText.fallback.lethal);
+    }
+  }
+  return out;
+}
+
+// 죽는 방식이 상대마다 달라야 한다 — 같은 함정의 반복이 되지 않도록.
+const lethalTexts = new Set([
+  ...lethalsIn(borrowedFaceDialogue),
+  ...lethalsIn(countingMouthDialogue),
+  ...lethalsIn(silentPilgrimDialogue),
+]);
+check("위험한 상대가 셋 이상이다", lethalsIn(borrowedFaceDialogue).length > 0 && lethalsIn(countingMouthDialogue).length > 0 && lethalsIn(silentPilgrimDialogue).length > 0);
+check("사망 사유 문구가 서로 다르다", lethalTexts.size >= 4, `${lethalTexts.size}종`);
+
+// 미끼는 절대 죽이지 않는다 — 이 반례가 없으면 "수상하면 도망"이 유일한 답이 된다.
+check("재를 지고 가는 사람에게는 치명적인 갈래가 없다", lethalsIn(ashBearerDialogue).length === 0);
+const bearerMenace = Object.values(ashBearerDialogue.nodes).some((n) => n.menace);
+check("그런데도 무섭게 보이도록 표시되어 있다", bearerMenace);
+
+// 셋을 세는 입: 세 번째 동의에서만 죽는다. 앞의 두 번은 안전해야 한다.
+const cm = countingMouthDialogue.nodes;
+check("첫 동의는 죽지 않는다", (cm["greet"].choices ?? []).every((c) => !c.lethal));
+check("둘째 노드까지도 죽지 않는다", (cm["one"].choices ?? []).every((c) => !c.lethal));
+check("셋째에서만 치명적인 갈래가 생긴다", (cm["two"].choices ?? []).some((c) => c.lethal));
+check("셋째 노드에도 거절할 길이 남아 있다", (cm["two"].choices ?? []).some((c) => !c.lethal));
+check("셈을 지적하면 안전하게 빠진다", (cm["two"].choices ?? []).some((c) => c.next === "caught" && !c.lethal));
+
+// 말없는 순례자: 한 번 말을 걸어도 죽지 않고, 두 번째에서만 위험해진다.
+const sp = silentPilgrimDialogue.nodes;
+check("첫 접촉은 경고로 끝난다", (sp["spoke-once"].choices ?? []).every((c) => !c.lethal));
+check("두 번째에는 자유 입력으로 넘어간다", !!sp["spoke-twice"].freeText);
+check("아무 말이나 하면 죽는다", !!sp["spoke-twice"].freeText!.fallback.lethal);
+
+// 사과하면 살아야 한다 — 살길이 실제로 동작하는지 판정식으로 확인한다.
+const apology = evaluateFreeText("미안합니다, 그만하겠습니다", sp["spoke-twice"]);
+check("사과하는 말은 살길로 이어진다", !apology.lethal && apology.next === "apology", apology.next);
+const insist = evaluateFreeText("당신 이름이 무엇입니까", sp["spoke-twice"]);
+check("우기면 죽는다", !!insist.lethal);
+check("살아 나온 기록이 남는다", sp["apology"].flagOnEnter === "spared-by-silent-pilgrim");
+
+// 어떤 위험한 상대에게도 첫 화면에서 그냥 지나갈 길이 있어야 한다.
+for (const [name, tree] of [
+  ["빌린 얼굴", borrowedFaceDialogue],
+  ["셋을 세는 입", countingMouthDialogue],
+  ["말없는 순례자", silentPilgrimDialogue],
+] as [string, DialogueTree][]) {
+  const start = tree.nodes[tree.startNode];
+  const first = start.choices ?? tree.nodes[start.next ?? ""]?.choices ?? [];
+  check(`${name}: 처음부터 안전하게 물러날 수 있다`, first.some((c) => !c.lethal));
+}
+
+// 선물 플래그가 실제 아이템을 가리켜야 한다.
+const giftFlags = Object.values(ashBearerDialogue.nodes)
+  .map((n) => n.flagOnEnter)
+  .filter((f): f is string => !!f && f.startsWith("gift:"));
+check("미끼 NPC가 선물을 준다", giftFlags.length === 1);
+check(
+  "선물 플래그가 실제 존재하는 아이템을 가리킨다",
+  giftFlags.every((f) => CONSUMABLE_POOL.some((c) => c.id === f.slice(5))),
+  giftFlags.join(", ")
+);
 
 // ---------------------------------------------------------------------------
 section("18. 누적 페널티를 값을 치르고 지울 수 있다");

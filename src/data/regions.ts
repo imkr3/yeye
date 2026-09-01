@@ -5,6 +5,9 @@ import { rivDialogue } from "./dialogues/riv";
 import { helgaDialogue } from "./dialogues/helga";
 import { morenDialogue } from "./dialogues/moren";
 import { borrowedFaceDialogue } from "./dialogues/borrowed-face";
+import { countingMouthDialogue } from "./dialogues/counting-mouth";
+import { silentPilgrimDialogue } from "./dialogues/silent-pilgrim";
+import { ashBearerDialogue } from "./dialogues/ash-bearer";
 
 export interface RegionNpcConfig {
   id: string;
@@ -69,7 +72,19 @@ export const REGIONS: Record<string, RegionConfig> = {
     platforms: [{ x: 650, y: 340, w: 120, h: 16 }],
     pickups: [{ id: "sunken-corridor-ledge-1", x: 650, y: 310, fragmentReward: 10 }],
     savePoint: { id: "sp-1", x: 2080, y: 420, label: "회랑 안쪽 분기점" },
-    npcs: [{ id: "isra", label: "이스라", x: 500, y: 420, color: 0x4c6e5c, shape: "leaf", dialogue: israDialogue }],
+    npcs: [
+      { id: "isra", label: "이스라", x: 500, y: 420, color: 0x4c6e5c, shape: "leaf", dialogue: israDialogue },
+      // 말을 거는 것 자체가 위험한 상대. 함정 앞쪽에 둬서 그냥 지나칠 수 있게 했다.
+      {
+        id: "silent-pilgrim",
+        label: "무릎 꿇은 사람",
+        x: 1450,
+        y: 420,
+        color: 0x3d4a7c,
+        shape: "zigzag",
+        dialogue: silentPilgrimDialogue,
+      },
+    ],
     nextRegionKey: "ash-market",
   },
 
@@ -81,7 +96,19 @@ export const REGIONS: Record<string, RegionConfig> = {
     movementMode: "topdown",
     playerStart: { x: 80, y: 300 },
     savePoint: { id: "sp-2", x: 700, y: 300, label: "시장 뒷골목 분기점" },
-    npcs: [{ id: "riv", label: "리브 칸", x: 320, y: 420, color: 0x3d4a7c, shape: "diamond", dialogue: rivDialogue }],
+    npcs: [
+      { id: "riv", label: "리브 칸", x: 320, y: 420, color: 0x3d4a7c, shape: "diamond", dialogue: rivDialogue },
+      // 한 마디씩은 전부 안전하다. 세 번 연속 동의할 때만 죽는다.
+      {
+        id: "counting-mouth",
+        label: "앉아 있는 것",
+        x: 840,
+        y: 470,
+        color: 0xa8873a,
+        shape: "triangle",
+        dialogue: countingMouthDialogue,
+      },
+    ],
     nextRegionKey: "frost-observatory",
     sideExit: { x: 480, y: 550, toRegionKey: "endless-stairs", label: "곁길: 끝없는 계단" },
     riftEntrance: { x: 800, y: 470, label: "균열: 유리맥의 지하도" },
@@ -114,6 +141,17 @@ export const REGIONS: Record<string, RegionConfig> = {
         color: 0x7c1f2b,
         shape: "diamond",
         dialogue: borrowedFaceDialogue,
+      },
+      // 미끼. 가장 무섭게 생겼지만 해롭지 않다 — "수상하면 도망"이 유일한 답이
+      // 되지 않도록 두는 반례.
+      {
+        id: "ash-bearer",
+        label: "천으로 감싼 사람",
+        x: 790,
+        y: 430,
+        color: 0x4c6e5c,
+        shape: "leaf",
+        dialogue: ashBearerDialogue,
       },
     ],
     sideExit: { x: 480, y: 560, toRegionKey: "ash-market", label: "재의 시장으로 돌아가기" },

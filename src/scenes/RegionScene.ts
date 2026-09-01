@@ -15,6 +15,7 @@ import {
   applyVowBacklash,
   clearVowBacklash,
   hasVowBacklash,
+  addConsumable,
 } from "../systems/RegressionSystem";
 import type { DialogueSceneData } from "./DialogueScene";
 import type { CombatSceneData } from "./CombatScene";
@@ -23,6 +24,7 @@ import { PLAYER_BASE } from "../data/combat/balance";
 import { COMPASS_FLAG, relicModifiers } from "../systems/EffectRegistry";
 import { paintScenery, type SceneryStyle } from "../render/scenery";
 import { PLATFORMING } from "../systems/Platforming";
+import { CONSUMABLE_POOL } from "../data/items/consumables";
 import { drawVolumetricCharacter, addIdleFloat } from "../render/volumetric";
 
 // 점프 상수는 Platforming에 모여 있다 — 함정 크기 검증이 같은 값을 쓰기 위해서.
@@ -577,6 +579,16 @@ export class RegionScene extends Phaser.Scene {
       const listener = flag.split(":")[1] ?? "unknown";
       setState(applyVowBacklash(state, listener));
       gameEvents.emit("achievement-earned", { label: "서약 역류 — 기억 하나가 흐려졌다" });
+      return;
+    }
+
+    // 대화 중 받는 물건 — "gift:아이템id" 형태. 이미 가진 것도 하나 더 쌓인다.
+    if (flag.startsWith("gift:")) {
+      const itemId = flag.slice("gift:".length);
+      const item = CONSUMABLE_POOL.find((c) => c.id === itemId);
+      if (!item) return;
+      setState(addConsumable(state, itemId));
+      gameEvents.emit("achievement-earned", { label: `${item.name}을(를) 받았다` });
       return;
     }
 
