@@ -9,6 +9,10 @@
 import {
   createInitialRegressionState,
   applyDeath,
+  penaltyPurgeCost,
+  purgeAllCost,
+  purgeOnePenalty,
+  purgeAllPenalties,
   advanceDeathMemory,
   deathMemoryTier,
   equipRelic,
@@ -54,6 +58,14 @@ import { pullOnce, pullFive, PITY_THRESHOLD, DUPLICATE_DUST, rarityOdds, priceFo
 import { CONSUMABLE_POOL } from "../src/data/items/consumables";
 import { RELIC_POOL } from "../src/data/items/relics";
 import { schoolOf } from "../src/data/economy/schools";
+import { REGIONS } from "../src/data/regions";
+import { israDialogue } from "../src/data/dialogues/isra";
+import { rivDialogue } from "../src/data/dialogues/riv";
+import { helgaDialogue } from "../src/data/dialogues/helga";
+import { morenDialogue } from "../src/data/dialogues/moren";
+import { borrowedFaceDialogue } from "../src/data/dialogues/borrowed-face";
+import type { DialogueNode, DialogueTree } from "../src/systems/DialogueSystem";
+import { hazardClearance, canClearHazard, maxJumpRise, MIN_CLEARANCE_RATIO } from "../src/systems/Platforming";
 import { PULSE_COUNTER, GLASS_MITE, SUTURED_PILGRIM, BACKFLOW_HOUND } from "../src/data/rifts/enemies";
 import { RELIC_POOL } from "../src/data/items/relics";
 
@@ -515,6 +527,146 @@ check("반격 유물이 없으면 방어만으로 피해가 없다", noCounter.e
 check("균열 회복 보너스가 합산된다", relicModifiers(["hollow-lantern", "tidewalkers-tabi"]).riftHealBonus === 11);
 check("천장 단축이 합산된다", relicModifiers(["vein-glass-monocle"]).pityReduction === 2);
 check("가루 배율이 곱해진다", Math.abs(relicModifiers(["ash-dusted-pouch", "dust-sifters-sieve"]).dustMultiplier - 3) < 1e-9);
+
+// ---------------------------------------------------------------------------
+section("16. 횡스크롤 함정을 실제로 점프로 넘을 수 있다");
+
+// 눈대중으로 정한 함정 크기 때문에 넘을 수 없는 구간이 두 개 있었다.
+// 이제 모든 횡스크롤 함정이 여유를 두고 넘어갈 수 있는지 여기서 확인한다.
+const sidescrollHazards = Object.entries(REGIONS).filter(
+  ([, r]) => r.movementMode === "sidescroll" && r.hazard && !r.hazard.combat
+);
+check("검사할 횡스크롤 함정이 존재한다", sidescrollHazards.length > 0);
+
+for (const [key, region] of sidescrollHazards) {
+  const c = hazardClearance(region.hazard!, region.groundY!);
+  check(
+    `${key}: 함정을 넘을 수 있다 (여유 ${c.ratio.toFixed(2)}배)`,
+    canClearHazard(region.hazard!, region.groundY!),
+    `필요 상승 ${c.requiredRise}px / 최대 ${maxJumpRise()}px, 체공 ${c.airWindow.toFixed(3)}s vs 통과 ${c.crossingTime.toFixed(3)}s`
+  );
+  check(`${key}: 점프 높이 안에 들어온다`, c.requiredRise < maxJumpRise());
+}
+
+// 판정식 자체가 맞는지 — 고쳐지기 전의 크기는 불가능으로 나와야 한다.
+const oldFrost = hazardClearance({ x: 1000, y: 420, w: 50, h: 150 }, 420);
+check("이전 서리 관측소 함정은 불가능으로 판정된다", oldFrost.ratio < 1, `${oldFrost.ratio.toFixed(2)}`);
+const oldSunken = hazardClearance({ x: 950, y: 420, w: 44, h: 140 }, 420);
+check("이전 침수 회랑 함정은 여유가 없다고 판정된다", oldSunken.ratio < MIN_CLEARANCE_RATIO, `${oldSunken.ratio.toFixed(2)}`);
+check("바닥보다 낮은 함정은 항상 통과 가능하다", hazardClearance({ x: 0, y: 600, w: 40, h: 10 }, 420).ratio === Infinity);
+
+// ---------------------------------------------------------------------------
+section("17. 모든 대화 트리에서 빠져나올 수 있다");
+
+const ALL_TREES: [string, DialogueTree][] = [
+  ["isra", israDialogue],
+  ["riv", rivDialogue],
+  ["helga", helgaDialogue],
+  ["moren", morenDialogue],
+  ["borrowed-face", borrowedFaceDialogue],
+];
+
+/** 한 노드에서 이어지는 모든 목적지 id. */
+function exitsOf(node: DialogueNode): string[] {
+  const out: string[] = [];
+  node.choices?.forEach((c) => out.push(c.next));
+  if (node.freeText) {
+    node.freeText.branches.forEach((b) => out.push(b.next));
+    out.push(node.freeText.fallback.next);
+  }
+  if (node.next) out.push(node.next);
+  return out;
+}
+
+/** 그 갈래가 죽음으로 끝나는지 — 죽음도 대화를 벗어나는 길이다. */
+function isLethalOnly(node: DialogueNode): boolean {
+  const choices = node.choices ?? [];
+  return choices.length > 0 && choices.every((c) => c.lethal);
+}
+
+for (const [name, tree] of ALL_TREES) {
+  const ids = new Set(Object.keys(tree.nodes));
+
+  // 1) 가리키는 노드가 실제로 있어야 한다 — 없으면 런타임에 예외가 터지며 대화가 멈춘다.
+  const dangling: string[] = [];
+  for (const node of Object.values(tree.nodes)) {
+    for (const dest of exitsOf(node)) if (!ids.has(dest)) dangling.push(`${node.id}→${dest}`);
+  }
+  check(`${name}: 존재하지 않는 노드를 가리키지 않는다`, dangling.length === 0, dangling.join(", "));
+
+  // 2) 모든 노드에 나갈 길이 있어야 한다. 예전에는 어느 갈래에도 걸리지 않는 노드가
+  //    버튼을 하나도 그리지 않아서 대화 창에 갇혔다.
+  const deadEnds = Object.values(tree.nodes)
+    .filter((n) => !n.end && exitsOf(n).length === 0 && !isLethalOnly(n))
+    .map((n) => n.id);
+  check(`${name}: 나갈 길 없는 노드가 없다`, deadEnds.length === 0, deadEnds.join(", "));
+
+  // 3) 시작 노드가 존재하고, 거기서 도달 가능한 종료 노드가 있어야 한다.
+  check(`${name}: 시작 노드가 존재한다`, ids.has(tree.startNode));
+
+  const seen = new Set<string>([tree.startNode]);
+  const queue = [tree.startNode];
+  let reachesEnd = false;
+  while (queue.length) {
+    const cur = tree.nodes[queue.shift()!];
+    if (!cur) continue;
+    if (cur.end) reachesEnd = true;
+    for (const dest of exitsOf(cur)) {
+      if (!seen.has(dest)) {
+        seen.add(dest);
+        queue.push(dest);
+      }
+    }
+  }
+  check(`${name}: 시작 지점에서 종료 노드에 닿을 수 있다`, reachesEnd);
+
+  // 4) 닿을 수 없는 노드는 쓰지 않은 원고이거나 연결을 빠뜨린 것이다.
+  const unreachable = [...ids].filter((id) => !seen.has(id));
+  check(`${name}: 닿을 수 없는 노드가 없다`, unreachable.length === 0, unreachable.join(", "));
+}
+
+// 치명적 갈래는 반드시 사유 문구를 갖는다 — 사망 화면에 빈 줄이 뜨지 않도록.
+const lethalChoices = ALL_TREES.flatMap(([, t]) =>
+  Object.values(t.nodes).flatMap((n) => (n.choices ?? []).filter((c) => c.lethal))
+);
+check("치명적 선택지가 실제로 존재한다", lethalChoices.length > 0, `${lethalChoices.length}개`);
+check("치명적 선택지에 사유 문구가 있다", lethalChoices.every((c) => (c.lethal ?? "").length > 8));
+
+// 빌린 얼굴은 죽지 않고 빠져나올 길이 반드시 있어야 한다.
+const bfStart = borrowedFaceDialogue.nodes[borrowedFaceDialogue.startNode];
+const bfFirst = bfStart.choices ?? borrowedFaceDialogue.nodes[bfStart.next!]?.choices ?? [];
+check("빌린 얼굴: 첫 갈림길에 안전한 선택지가 있다", bfFirst.some((c) => !c.lethal));
+
+// ---------------------------------------------------------------------------
+section("18. 누적 페널티를 값을 치르고 지울 수 있다");
+
+let penaltyState = fresh();
+const seededRng = createRng("death-1");
+penaltyState = applyDeath(applyDeath(applyDeath(penaltyState, seededRng), seededRng), seededRng);
+check("죽을 때마다 페널티가 하나씩 붙는다", penaltyState.accumulatedPenalties.length === 3);
+check("죽음 횟수가 함께 올라간다", penaltyState.runCount === 3);
+
+// 같은 시드면 같은 결과 — 예전에는 여기만 Math.random을 직접 썼다.
+const repeatA = applyDeath(fresh(), createRng("same"));
+const repeatB = applyDeath(fresh(), createRng("same"));
+check("같은 시드는 같은 페널티를 준다", repeatA.accumulatedPenalties[0].id === repeatB.accumulatedPenalties[0].id);
+
+check("페널티가 쌓일수록 정화 값이 오른다", penaltyPurgeCost(3) > penaltyPurgeCost(1));
+check("페널티가 없으면 값이 0이다", penaltyPurgeCost(0) === 0);
+check(
+  "전부 정화 값은 하나씩 지울 때의 합계와 같다",
+  purgeAllCost(3) === penaltyPurgeCost(3) + penaltyPurgeCost(2) + penaltyPurgeCost(1)
+);
+
+const purgedOne = purgeOnePenalty(penaltyState);
+check("하나 정화하면 하나만 줄어든다", purgedOne.accumulatedPenalties.length === 2);
+check("정화해도 회귀 횟수는 남는다", purgedOne.runCount === 3);
+const purgedAll = purgeAllPenalties(penaltyState);
+check("전부 정화하면 비워진다", purgedAll.accumulatedPenalties.length === 0);
+check("페널티가 없을 때 정화해도 문제없다", purgeAllPenalties(fresh()).accumulatedPenalties.length === 0);
+
+// 정화 후에도 저장 정규화를 통과해야 한다.
+check("정화한 상태가 저장 규격을 지킨다", normalizeState(purgedAll).accumulatedPenalties.length === 0);
 
 // ---------------------------------------------------------------------------
 console.log(`\n${passed}개 통과, ${failed}개 실패`);

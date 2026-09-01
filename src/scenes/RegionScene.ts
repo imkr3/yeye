@@ -22,10 +22,21 @@ import { RIFT_ENEMIES } from "../data/rifts/enemies";
 import { PLAYER_BASE } from "../data/combat/balance";
 import { COMPASS_FLAG, relicModifiers } from "../systems/EffectRegistry";
 import { paintScenery, type SceneryStyle } from "../render/scenery";
+import { PLATFORMING } from "../systems/Platforming";
 import { drawVolumetricCharacter, addIdleFloat } from "../render/volumetric";
 
-const JUMP_VELOCITY = -420;
-const GRAVITY_Y = 900;
+// 점프 상수는 Platforming에 모여 있다 — 함정 크기 검증이 같은 값을 쓰기 위해서.
+/** 가까이 갔을 때 키를 눌러 실행하는 대상 (NPC·환로·균열 입구). */
+interface Interactable {
+  x: number;
+  y: number;
+  radius: number;
+  prompt: string;
+  run: () => void;
+}
+
+const JUMP_VELOCITY = -PLATFORMING.jumpSpeed;
+const GRAVITY_Y = PLATFORMING.gravity;
 
 /**
  * 지역 하나를 표현하는 재사용 가능한 씬. data/regions.ts의 설정을 읽어
@@ -46,6 +57,16 @@ export class RegionScene extends Phaser.Scene {
   private exchangeOpen = false;
   /** 「낡은 나침반」이 켜져 있을 때만 존재하는 화면 고정 바늘. */
   private compass: Phaser.GameObjects.Container | null = null;
+  /**
+   * 상호작용 대상. 예전에는 겹침(overlap) 콜백이 매 프레임 실행되면서 대화를 열었는데,
+   * 대화를 닫아도 플레이어가 여전히 NPC 위에 서 있으므로 다음 프레임에 곧바로 다시
+   * 열려서 빠져나올 수 없었다. 이제는 가까이 갔을 때 안내만 띄우고, 실제로 여는 것은
+   * 플레이어가 키를 눌렀을 때뿐이다.
+   */
+  private interactables: Interactable[] = [];
+  private interactKey!: Phaser.Input.Keyboard.Key;
+  private interactAltKey!: Phaser.Input.Keyboard.Key;
+  private promptText!: Phaser.GameObjects.Text;
 
   constructor() {
     super("RegionScene");
@@ -59,6 +80,7 @@ export class RegionScene extends Phaser.Scene {
     this.enteringRift = false;
     this.exchangeOpen = false;
     this.compass = null;
+    this.interactables = [];
   }
 
   create() {
@@ -80,7 +102,14 @@ export class RegionScene extends Phaser.Scene {
     if (isSidescroll) {
       this.physics.world.gravity.y = GRAVITY_Y;
       // 바닥 충돌체 — 시각적 바닥은 paintScenery가 그린다.
-      const ground = this.add.rectangle(worldWidth / 2, groundY + 20, worldWidth, 8, 0x000000, 0);
+      const ground = this.add.rectangle(
+        worldWidth / 2,
+        groundY + PLATFORMING.groundColliderOffset,
+        worldWidth,
+        PLATFORMING.groundColliderThickness,
+        0x000000,
+        0
+      );
       this.physics.add.existing(ground, true);
       this.groundCollider = ground;
 
@@ -107,13 +136,27 @@ export class RegionScene extends Phaser.Scene {
     this.player.setDepth(4);
     this.physics.add.existing(this.player);
     const playerBody = this.player.body as Phaser.Physics.Arcade.Body;
-    playerBody.setCircle(14, -14, -14);
+    playerBody.setCircle(PLATFORMING.playerBodyRadius, -PLATFORMING.playerBodyRadius, -PLATFORMING.playerBodyRadius);
     if (isSidescroll) {
       playerBody.setCollideWorldBounds(true);
       if (this.groundCollider) this.physics.add.collider(this.player, this.groundCollider);
       this.platformColliders.forEach((p) => this.physics.add.collider(this.player, p));
     }
     this.cursors = this.input.keyboard!.createCursorKeys();
+    this.interactKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.E);
+    this.interactAltKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE);
+    this.promptText = this.add
+      .text(480, 520, "", {
+        fontFamily: "monospace",
+        fontSize: "13px",
+        color: "#ece3ce",
+        backgroundColor: "#0e0c09cc",
+        padding: { x: 10, y: 6 },
+      })
+      .setOrigin(0.5)
+      .setScrollFactor(0)
+      .setDepth(100)
+      .setVisible(false);
 
     if (isSidescroll) {
       this.cameras.main.startFollow(this.player, true, 0.12, 0.12);
@@ -183,13 +226,17 @@ export class RegionScene extends Phaser.Scene {
         .setOrigin(0.5)
         .setDepth(6);
 
-      const zone = this.add.rectangle(re.x, re.y, 96, 40, 0x000000, 0);
-      this.physics.add.existing(zone, true);
-      this.physics.add.overlap(this.player, zone as unknown as Phaser.GameObjects.GameObject, () => {
-        if (this.enteringRift) return;
-        this.enteringRift = true;
-        flushSave();
-        this.scene.start("RiftScene");
+      this.interactables.push({
+        x: re.x,
+        y: re.y,
+        radius: 64,
+        prompt: "균열로 내려간다",
+        run: () => {
+          if (this.enteringRift) return;
+          this.enteringRift = true;
+          flushSave();
+          this.scene.start("RiftScene");
+        },
       });
     }
 
@@ -214,17 +261,21 @@ export class RegionScene extends Phaser.Scene {
         .setOrigin(0.5)
         .setDepth(6);
 
-      const zone = this.add.rectangle(ep.x, ep.y, 70, 80, 0x000000, 0);
-      this.physics.add.existing(zone, true);
-      this.physics.add.overlap(this.player, zone as unknown as Phaser.GameObjects.GameObject, () => {
-        if (this.exchangeOpen) return;
-        this.exchangeOpen = true;
-        this.scene.pause();
-        this.scene.launch("ExchangeScene");
-        this.scene.get("ExchangeScene").events.once("shutdown", () => {
-          this.exchangeOpen = false;
-          this.scene.resume();
-        });
+      this.interactables.push({
+        x: ep.x,
+        y: ep.y,
+        radius: 62,
+        prompt: "환로를 연다",
+        run: () => {
+          if (this.exchangeOpen) return;
+          this.exchangeOpen = true;
+          this.scene.pause();
+          this.scene.launch("ExchangeScene");
+          this.scene.get("ExchangeScene").events.once("shutdown", () => {
+            this.exchangeOpen = false;
+            this.scene.resume();
+          });
+        },
       });
     }
 
@@ -236,19 +287,21 @@ export class RegionScene extends Phaser.Scene {
         scale: 14,
       });
       npcSilhouette.setDepth(3);
-      this.physics.add.existing(npcSilhouette, true);
-      (npcSilhouette.body as Phaser.Physics.Arcade.Body).setCircle(12, -12, -12);
       addIdleFloat(this, npcSilhouette);
       this.add.text(npc.x, npc.y + 22, npc.label, { fontSize: "11px", color: "#cbbfa5" }).setOrigin(0.5);
-      this.physics.add.overlap(this.player, npcSilhouette as unknown as Phaser.GameObjects.GameObject, () => {
-        this.openDialogue(npc);
+      this.interactables.push({
+        x: npc.x,
+        y: npc.y,
+        radius: 58,
+        prompt: `${npc.label}에게 말을 건다`,
+        run: () => this.openDialogue(npc),
       });
     });
 
     if (isSidescroll) {
-      this.add.text(24, 574, "← → 이동 · ↑ 점프", { fontSize: "11px", color: "#8b7f6d" }).setScrollFactor(0).setDepth(100);
+      this.add.text(24, 574, "← → 이동 · ↑ 점프 · E 상호작용", { fontSize: "11px", color: "#8b7f6d" }).setScrollFactor(0).setDepth(100);
     } else {
-      this.add.text(24, 574, "방향키로 이동", { fontSize: "11px", color: "#8b7f6d" }).setScrollFactor(0).setDepth(100);
+      this.add.text(24, 574, "방향키로 이동 · E 상호작용", { fontSize: "11px", color: "#8b7f6d" }).setScrollFactor(0).setDepth(100);
     }
 
     // 픽업 — 플레이어가 만들어진 뒤에 배치해야 overlap 대상이 유효하다.
@@ -303,6 +356,44 @@ export class RegionScene extends Phaser.Scene {
     }
 
     this.updateCompass();
+    this.updateInteractions();
+  }
+
+  // --- 상호작용 ------------------------------------------------------------
+
+  /**
+   * 가장 가까운 대상만 안내하고, 실행은 키 입력에만 반응한다.
+   * JustDown을 쓰므로 키를 누르고 있어도 한 번만 열린다 — 닫자마자 다시 열리던 문제의 핵심.
+   */
+  private updateInteractions() {
+    if (this.dialogueOpen || this.exchangeOpen || this.enteringRift) {
+      this.promptText.setVisible(false);
+      return;
+    }
+
+    let nearest: Interactable | null = null;
+    let nearestDist = Infinity;
+    for (const it of this.interactables) {
+      const d = Phaser.Math.Distance.Between(this.player.x, this.player.y, it.x, it.y);
+      if (d <= it.radius && d < nearestDist) {
+        nearest = it;
+        nearestDist = d;
+      }
+    }
+    if (!nearest) {
+      this.promptText.setVisible(false);
+      return;
+    }
+
+    this.promptText.setText(`[E] ${nearest.prompt}`).setVisible(true);
+
+    if (
+      Phaser.Input.Keyboard.JustDown(this.interactKey) ||
+      Phaser.Input.Keyboard.JustDown(this.interactAltKey)
+    ) {
+      this.promptText.setVisible(false);
+      nearest.run();
+    }
   }
 
   // --- 낡은 나침반 --------------------------------------------------------
@@ -357,7 +448,7 @@ export class RegionScene extends Phaser.Scene {
   }
 
   private updateSidescroll(body: Phaser.Physics.Arcade.Body, time: number) {
-    const speed = 220 * relicModifiers(getState().equippedRelics).moveSpeedMultiplier;
+    const speed = PLATFORMING.runSpeed * relicModifiers(getState().equippedRelics).moveSpeedMultiplier;
     body.setVelocityX(0);
 
     if (this.cursors.left?.isDown) {
@@ -391,9 +482,10 @@ export class RegionScene extends Phaser.Scene {
     }
   }
 
-  private onDeath() {
+  private onDeath(reason?: string) {
     setState(applyDeath(getState()));
     gameEvents.emit("death-flash");
+    if (reason) gameEvents.emit("achievement-earned", { label: reason });
 
     this.time.delayedCall(400, () => {
       const sp = getState().currentSavePoint;
@@ -524,6 +616,13 @@ export class RegionScene extends Phaser.Scene {
         setState(adjustTrust(getState(), npcId, scaled));
       },
       onFlag: (flag) => this.handleDialogueFlag(flag),
+      // 「거짓말 탐지 부표」를 지녔다면 위험한 갈래가 표시된다.
+      revealDanger: getState().inventory.consumables.includes("truth-buoy"),
+      onLethal: (reason) => {
+        this.dialogueOpen = false;
+        this.scene.resume();
+        this.onDeath(reason);
+      },
       onClose: () => {
         this.dialogueOpen = false;
         this.scene.resume();

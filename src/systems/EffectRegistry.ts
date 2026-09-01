@@ -363,7 +363,7 @@ const CONSUMABLE_EFFECTS: Record<string, ConsumableDefinition> = {
     },
   },
   "truth-buoy": {
-    note: "이번 전투의 적 의도를 완전히 드러낸다",
+    note: "지닌 것만으로 대화의 위험한 갈래가 보인다 · 전투에서 쓰면 적 의도 공개",
     combat: (state) => {
       state.memoryTier = 3;
       return "거짓말 탐지 부표 — 상대의 다음 수가 또렷하게 읽힌다.";

@@ -1,4 +1,4 @@
-import { newRunSeed } from "./Rng";
+import { newRunSeed, createSystemRng, type Rng } from "./Rng";
 
 export const SAVE_VERSION = 2;
 
@@ -327,7 +327,7 @@ export function addStoryFlag(state: RegressionState, flag: string): RegressionSt
  * 죽음 발생 시 호출. 세이브 포인트로 되돌리고 페널티 하나를 누적시킨다.
  * 액막이 부적으로 얻은 wardCharges가 있으면, 이번 죽음의 페널티만 막고 하나를 소모한다.
  */
-export function applyDeath(state: RegressionState): RegressionState {
+export function applyDeath(state: RegressionState, rng: Rng = createSystemRng()): RegressionState {
   if (state.wardCharges > 0) {
     return {
       ...state,
@@ -336,13 +336,47 @@ export function applyDeath(state: RegressionState): RegressionState {
     };
   }
 
-  const penalty = PENALTY_POOL[Math.floor(Math.random() * PENALTY_POOL.length)];
+  // 이 프로젝트의 다른 무작위는 전부 주입된 Rng를 쓴다. 여기만 Math.random을 직접
+  // 부르고 있어서 죽음 결과만 재현이 안 됐다.
+  const penalty = rng.pick(PENALTY_POOL);
   return {
     ...state,
     runCount: state.runCount + 1,
     accumulatedPenalties: [...state.accumulatedPenalties, penalty],
     // carriedItems는 유지, 그 외 진행 상태는 세이브 포인트 시점으로 되돌아간다는 전제.
   };
+}
+
+/**
+ * 누적 페널티 정화.
+ *
+ * 페널티는 죽을 때마다 하나씩 붙고 스스로 사라지지 않는다. 환로에서 여진화를 치러
+ * 덜어낼 수 있게 하되, 값은 쌓인 개수에 따라 올라간다 — 죽음이 공짜가 되지 않도록.
+ */
+export const PENALTY_PURGE = { base: 50, step: 35 };
+
+/** 페널티가 count개 쌓여 있을 때, 하나를 지우는 값. */
+export function penaltyPurgeCost(count: number): number {
+  if (count <= 0) return 0;
+  return PENALTY_PURGE.base + PENALTY_PURGE.step * (count - 1);
+}
+
+/** 전부 지우는 값 — 하나씩 지울 때의 합계와 같다. 묶음 할인은 없다. */
+export function purgeAllCost(count: number): number {
+  let total = 0;
+  for (let n = count; n >= 1; n--) total += penaltyPurgeCost(n);
+  return total;
+}
+
+/** 가장 오래된 페널티 하나를 지운다. 값은 호출부가 이미 치렀다고 본다. */
+export function purgeOnePenalty(state: RegressionState): RegressionState {
+  if (state.accumulatedPenalties.length === 0) return state;
+  return { ...state, accumulatedPenalties: state.accumulatedPenalties.slice(1) };
+}
+
+export function purgeAllPenalties(state: RegressionState): RegressionState {
+  if (state.accumulatedPenalties.length === 0) return state;
+  return { ...state, accumulatedPenalties: [] };
 }
 
 /** 새 분기점 도달 시 호출. 이전 세이브 포인트는 더 이상 되돌아갈 수 없게 갱신된다. */

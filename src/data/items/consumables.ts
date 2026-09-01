@@ -25,7 +25,7 @@ export const CONSUMABLE_POOL: ConsumableItem[] = [
   // --- R ---
   { id: "warding-talisman", name: "액막이 종이부적", rarity: "R", flavor: "저주를 막는다지만, 정작 본인은 못 믿는 눈치다.", effect: "죽음 페널티 적용을 1회 완전히 방지한다." },
   { id: "rewound-hand", name: "되감긴 시침", rarity: "R", flavor: "시곗바늘이 아주 잠깐, 거꾸로 돈다.", effect: "세이브 포인트를 갱신하지 않은 채 같은 자리에서 한 번 더 기회를 얻는다." },
-  { id: "truth-buoy", name: "거짓말 탐지 부표", rarity: "R", flavor: "물 위에 뜬 채로 진위를 가려낸다.", effect: "대화 상대 발언의 진실 여부를 3회까지 확인할 수 있다." },
+  { id: "truth-buoy", name: "거짓말 탐지 부표", rarity: "R", flavor: "물 위에 뜬 채로 진위를 가려낸다.", effect: "지니고 있으면 대화에서 치명적인 선택지가 드러난다. 전투 중 사용하면 적의 의도가 보인다." },
   { id: "helgas-notebook-copy", name: "헬가의 실험 노트 사본", rarity: "R", flavor: "필체가 지나치게 꼼꼼하다.", effect: "서리 관측소의 함정을 전부 표시한다." },
 
   // --- SR ---
