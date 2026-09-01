@@ -1,10 +1,12 @@
 name: Deploy to GitHub Pages
 
+# main에서만 배포한다. github-pages 환경이 기본 브랜치의 배포만 허용하므로
+# 작업 브랜치 실행은 항상 deploy 단계에서 실패했고, concurrency 그룹이 같아서
+# 그 실패한 실행이 main의 진짜 배포를 취소해 버렸다.
 on:
   push:
     branches:
       - main
-      - claude/novel-site-link-comprehension-udjvbb
   workflow_dispatch:
 
 permissions:
