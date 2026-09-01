@@ -35,4 +35,8 @@ const config: Phaser.Types.Core.GameConfig = {
   scene: [BootScene, RegionScene, StatusOverlayScene, DialogueScene, EndingScene, CombatScene, ToastScene, GachaScene, InventoryScene, RiftScene, RegressionSummaryScene, ExchangeScene, SettingsScene],
 };
 
-new Phaser.Game(config);
+const game = new Phaser.Game(config);
+
+// 브라우저 자동화 스모크 테스트가 씬 상태를 들여다볼 수 있도록 노출한다.
+// 게임 로직은 이 참조를 쓰지 않는다.
+(window as unknown as { __UNBROKEN_VOW__?: Phaser.Game }).__UNBROKEN_VOW__ = game;
