@@ -145,8 +145,10 @@ export class RegionScene extends Phaser.Scene {
       this.platformColliders.forEach((p) => this.physics.add.collider(this.player, p));
     }
     this.cursors = this.input.keyboard!.createCursorKeys();
-    this.interactKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.E);
-    this.interactAltKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE);
+    // enableCapture=false — 캡처는 전역이라, 켜두면 대화 입력창에서 'e'와 스페이스가
+    // preventDefault되어 아예 타이핑되지 않는다.
+    this.interactKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.E, false);
+    this.interactAltKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE, false);
     this.promptText = this.add
       .text(480, 520, "", {
         fontFamily: "monospace",

@@ -9,12 +9,14 @@
     "build": "tsc -b && vite build",
     "preview": "vite preview",
     "test": "esbuild tests/systems.test.ts --bundle --platform=node --format=cjs --outfile=node_modules/.cache/systems.test.cjs --log-level=error && node node_modules/.cache/systems.test.cjs",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test:browser": "node tests/browser.test.mjs"
   },
   "dependencies": {
     "phaser": "^3.80.1"
   },
   "devDependencies": {
+    "playwright": "^1.49.1",
     "typescript": "^5.6.2",
     "vite": "^5.4.10"
   }

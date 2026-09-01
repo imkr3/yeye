@@ -97,6 +97,8 @@ export class DialogueScene extends Phaser.Scene {
   }
 
   private cleanup() {
+    // 입력창에 포커스가 남은 채 창이 닫혔을 수 있다 — 캡처를 반드시 되돌린다.
+    this.input?.keyboard?.enableGlobalCapture();
     if (this.escHandler) {
       window.removeEventListener("keydown", this.escHandler);
       this.escHandler = undefined;
@@ -218,6 +220,17 @@ export class DialogueScene extends Phaser.Scene {
     const dom = this.add.dom(80, 500, inputEl).setOrigin(0, 0);
     this.optionObjects.push(dom);
 
+    /*
+     * Phaser의 키보드 캡처는 전역이다. 매니저가 window에 리스너를 걸고, 캡처 목록에
+     * 있는 키코드면 이벤트 대상이 무엇이든 preventDefault를 부른다 — HTML <input>
+     * 안이라도 마찬가지다. 방향키·Shift·Space는 createCursorKeys()가, E는 상호작용
+     * 키가 캡처 목록에 올린다. 그래서 이 입력창에 스페이스와 'e'가 아예 찍히지 않았다.
+     * 입력 중에만 전역 캡처를 꺼서, 타이핑하는 동안에는 브라우저가 정상 동작하게 한다.
+     */
+    const keyboard = this.input.keyboard;
+    inputEl.addEventListener("focus", () => keyboard?.disableGlobalCapture());
+    inputEl.addEventListener("blur", () => keyboard?.enableGlobalCapture());
+
     const submitBtn = this.add.text(80, 530, "[ 전달 ]", {
       fontFamily: "monospace",
       fontSize: "13px",
@@ -227,7 +240,13 @@ export class DialogueScene extends Phaser.Scene {
 
     const submit = () => {
       const value = inputEl.value.trim();
-      if (!value) return;
+      if (!value) {
+        // 예전에는 아무 반응 없이 조용히 무시해서, 버튼이 고장난 것처럼 보였다.
+        submitBtn.setText("[ 전달 ] — 할 말을 입력하세요");
+        this.time.delayedCall(1400, () => submitBtn.setText("[ 전달 ]"));
+        inputEl.focus();
+        return;
+      }
       const result = evaluateFreeText(value, node);
       if (result.lethal) {
         this.triggerLethal(result.lethal);
