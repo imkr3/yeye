@@ -13,6 +13,11 @@ export interface DialogueChoice {
   trustDelta?: number;
   /** 엔딩 판정 등에 쓰이는 스토리 플래그. */
   flag?: string;
+  /**
+   * 이 갈래를 고르면 그 자리에서 죽는다. 문자열은 사망 사유로 화면에 남는다.
+   * 전투 없이 대화만으로 죽을 수 있게 하는 장치 — 상대가 사람이 아닐 때 쓴다.
+   */
+  lethal?: string;
 }
 
 export interface FreeTextBranch {
@@ -21,6 +26,8 @@ export interface FreeTextBranch {
   next: string;
   trustDelta?: number;
   flag?: string;
+  /** 자유 입력으로도 죽을 수 있다 — 말해선 안 되는 것을 말했을 때. */
+  lethal?: string;
 }
 
 export interface DialogueNode {
@@ -39,6 +46,11 @@ export interface DialogueNode {
   next?: string;
   /** 대화 종료 노드 */
   end?: boolean;
+  /**
+   * 가면이 벗겨진 순간. 대화 창의 색이 바뀌어 플레이어에게 신호를 준다 —
+   * 답을 알려주지는 않되, 위험하다는 것 정도는 읽을 수 있어야 한다.
+   */
+  menace?: boolean;
 }
 
 export interface DialogueTree {
@@ -64,13 +76,18 @@ export function getNode(tree: DialogueTree, nodeId: string): DialogueNode {
 export function evaluateFreeText(
   input: string,
   node: DialogueNode
-): { next: string; trustDelta?: number; flag?: string } {
+): { next: string; trustDelta?: number; flag?: string; lethal?: string } {
   if (!node.freeText) throw new Error("자유 입력 노드가 아닙니다.");
   const normalized = input.trim().toLowerCase();
 
   for (const branch of node.freeText.branches) {
     if (branch.keywords.some((k) => normalized.includes(k.toLowerCase()))) {
-      return { next: branch.next, trustDelta: branch.trustDelta, flag: branch.flag };
+      return {
+        next: branch.next,
+        trustDelta: branch.trustDelta,
+        flag: branch.flag,
+        lethal: branch.lethal,
+      };
     }
   }
   return node.freeText.fallback;

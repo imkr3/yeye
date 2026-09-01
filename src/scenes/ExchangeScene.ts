@@ -16,7 +16,13 @@ import {
 import { MARKET_TIPOFF_FLAG } from "../systems/EffectRegistry";
 import { SCHOOL_COLOR, SCHOOL_LABEL, schoolOf, type School } from "../data/economy/schools";
 import { RARITY_COLOR } from "../systems/GachaSystem";
-import { addCoins } from "../systems/RegressionSystem";
+import {
+  addCoins,
+  penaltyPurgeCost,
+  purgeAllCost,
+  purgeAllPenalties,
+  purgeOnePenalty,
+} from "../systems/RegressionSystem";
 import { getState, setState } from "../state/gameState";
 import { createRng } from "../systems/Rng";
 import { lerpColor, shade } from "../render/colors";
@@ -334,8 +340,28 @@ export class ExchangeScene extends Phaser.Scene {
           this.render();
         },
       },
-      { label: "나가기", act: () => this.scene.stop() },
     ];
+
+    // 누적 페널티 정화 — 쌓여 있을 때만 메뉴에 나온다.
+    const penaltyCount = state.accumulatedPenalties.length;
+    if (penaltyCount > 0) {
+      const oneCost = penaltyPurgeCost(penaltyCount);
+      const allCost = purgeAllCost(penaltyCount);
+      opts.push({
+        label: `페널티 하나 정화 (여진화 ${oneCost})`,
+        act: () => this.purge(false, oneCost),
+        disabled: !canAfford(state, oneCost),
+      });
+      if (penaltyCount > 1) {
+        opts.push({
+          label: `페널티 전부 정화 ×${penaltyCount} (여진화 ${allCost})`,
+          act: () => this.purge(true, allCost),
+          disabled: !canAfford(state, allCost),
+        });
+      }
+    }
+
+    opts.push({ label: "나가기", act: () => this.scene.stop() });
 
     this.options = opts;
     this.panel(40, 464, 880, 116, 0xd8a24a);
@@ -359,6 +385,22 @@ export class ExchangeScene extends Phaser.Scene {
       }
       this.nodes.push(node);
     });
+  }
+
+  /** 값을 치르고 누적 페널티를 덜어낸다. */
+  private purge(all: boolean, cost: number) {
+    const state = getState();
+    if (!canAfford(state, cost)) return;
+    const paid = addCoins(state, -cost);
+    const before = paid.accumulatedPenalties.length;
+    const next = all ? purgeAllPenalties(paid) : purgeOnePenalty(paid);
+    setState(next);
+    const removed = before - next.accumulatedPenalties.length;
+    this.message =
+      next.accumulatedPenalties.length === 0
+        ? `페널티 ${removed}개를 씻어냈다. 몸이 가벼워진다.`
+        : `페널티 ${removed}개를 씻어냈다. 아직 ${next.accumulatedPenalties.length}개가 남아 있다.`;
+    this.render();
   }
 
   private toggleBias() {

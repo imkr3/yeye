@@ -4,6 +4,7 @@ import { israDialogue } from "./dialogues/isra";
 import { rivDialogue } from "./dialogues/riv";
 import { helgaDialogue } from "./dialogues/helga";
 import { morenDialogue } from "./dialogues/moren";
+import { borrowedFaceDialogue } from "./dialogues/borrowed-face";
 
 export interface RegionNpcConfig {
   id: string;
@@ -63,7 +64,8 @@ export const REGIONS: Record<string, RegionConfig> = {
     worldWidth: 2200,
     groundY: 420,
     playerStart: { x: 80, y: 420 },
-    hazard: { x: 950, y: 420, w: 44, h: 140, label: "함정 — 점프로 넘으세요" },
+    // 크기는 Platforming.hazardClearance가 검증한다 — 여유 배율 1.4 미만이면 테스트가 실패한다.
+    hazard: { x: 950, y: 420, w: 44, h: 90, label: "갈라진 바닥 — 점프로 넘으세요" },
     platforms: [{ x: 650, y: 340, w: 120, h: 16 }],
     pickups: [{ id: "sunken-corridor-ledge-1", x: 650, y: 310, fragmentReward: 10 }],
     savePoint: { id: "sp-1", x: 2080, y: 420, label: "회랑 안쪽 분기점" },
@@ -101,7 +103,19 @@ export const REGIONS: Record<string, RegionConfig> = {
       label: "무너지는 계단참 (닿으면 전투)",
       combat: { encounterId: "stairwell-wreckage", enemyName: "무너진 잔해", enemyMaxHp: 40 },
     },
-    npcs: [{ id: "moren", label: "모른", x: 480, y: 480, color: 0x8c8168, shape: "zigzag", dialogue: morenDialogue }],
+    npcs: [
+      { id: "moren", label: "모른", x: 480, y: 480, color: 0x8c8168, shape: "zigzag", dialogue: morenDialogue },
+      // 사람이 아닌 상대. 말 한마디로 죽을 수 있는 첫 자리다.
+      {
+        id: "borrowed-face",
+        label: "낯익은 얼굴",
+        x: 170,
+        y: 430,
+        color: 0x7c1f2b,
+        shape: "diamond",
+        dialogue: borrowedFaceDialogue,
+      },
+    ],
     sideExit: { x: 480, y: 560, toRegionKey: "ash-market", label: "재의 시장으로 돌아가기" },
   },
 
@@ -114,7 +128,7 @@ export const REGIONS: Record<string, RegionConfig> = {
     worldWidth: 2000,
     groundY: 420,
     playerStart: { x: 80, y: 420 },
-    hazard: { x: 1000, y: 420, w: 50, h: 150, label: "정면 승부 불가 구간 — 점프로 넘으세요" },
+    hazard: { x: 1000, y: 420, w: 50, h: 96, label: "서리 갈퀴 — 점프로 넘으세요" },
     platforms: [{ x: 700, y: 340, w: 120, h: 16 }, { x: 1350, y: 340, w: 120, h: 16 }],
     pickups: [
       { id: "frost-observatory-ledge-1", x: 700, y: 310, fragmentReward: 10 },
