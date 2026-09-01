@@ -451,12 +451,14 @@ check("설명만 있고 효과가 없는 소모품이 없다", effectless.length
 let compassState = fresh();
 compassState = { ...compassState, inventory: { consumables: ["worn-compass"], relics: [] } };
 const compassNote = fieldUseMessage(compassState, "worn-compass");
-check(
-  "나침반 문구가 현재 분기점 이름을 담는다",
-  !!compassNote && compassNote.includes(compassState.currentSavePoint.label),
-  compassNote ?? "(없음)"
-);
+check("나침반이 사용 문구를 돌려준다", !!compassNote, compassNote ?? "(없음)");
 const compassUsed = applyFieldConsumable(compassState, "worn-compass");
+// 바늘은 지역의 분기점을 가리키므로, 문구가 마지막 기록 분기점 이름을 단정하면 안 된다.
+check(
+  "나침반 문구가 특정 분기점 이름을 단정하지 않는다",
+  !compassNote!.includes(compassState.currentSavePoint.label)
+);
+check("이미 켜져 있으면 다른 문구를 준다", fieldUseMessage(compassUsed, "worn-compass") !== compassNote);
 check("나침반이 방향 표시를 켠다", compassUsed.storyFlags.includes(COMPASS_FLAG));
 check("나침반도 사용하면 소모된다", compassUsed.inventory.consumables.length === 0);
 

@@ -439,10 +439,14 @@ const CONSUMABLE_EFFECTS: Record<string, ConsumableDefinition> = {
     rift: () => ({ skipRoom: true, message: "반투명 열쇠 — 없던 문이 열린다. 이 방은 지나간다." }),
   },
   "worn-compass": {
-    note: "분기점 방향 표시를 켠다 (지역 이동 전까지)",
+    note: "이 지역의 분기점 방향을 가리킨다 (지역 이동 전까지)",
     field: (state) => addStoryFlag(state, COMPASS_FLAG),
+    // 바늘은 지금 있는 지역의 분기점을 가리킨다. 마지막으로 기록한 분기점과는
+    // 다를 수 있으므로, 문구에서 특정 이름을 단정하지 않는다.
     report: (state) =>
-      `낡은 나침반 — 바늘이 「${state.currentSavePoint.label}」 쪽으로 굳었다.`,
+      state.storyFlags.includes(COMPASS_FLAG)
+        ? "낡은 나침반 — 이미 바늘이 서 있다."
+        : "낡은 나침반 — 바늘이 이 지역의 분기점을 찾기 시작한다.",
   },
   "folded-flyer": {
     note: "다음 환로 구매를 15% 싸게 한다",
