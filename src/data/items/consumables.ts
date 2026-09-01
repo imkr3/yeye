@@ -34,4 +34,27 @@ export const CONSUMABLE_POOL: ConsumableItem[] = [
 
   // --- SSR ---
   { id: "unnamed-invitation", name: "이름 없는 자의 초대장", rarity: "SSR", flavor: "받는 사람 이름 칸이 비어 있다. 당신 것이 맞다.", effect: "히든 루트로 즉시 이동한다." },
+
+  // === 2차 배치 =============================================================
+  // --- C ---
+  { id: "cracked-whetstone", name: "금 간 숫돌", rarity: "C", flavor: "갈면 갈수록 저도 같이 닳는다.", effect: "한 번 반격당하지 않는 행동을 얻는다." },
+  { id: "salt-wrapped-bandage", name: "소금 감은 붕대", rarity: "C", flavor: "쓰라린 만큼 잘 듣는다.", effect: "체력을 회복하고 얼룩을 조금 씻어낸다." },
+  { id: "riverbed-pebble", name: "강바닥 조약돌", rarity: "C", flavor: "오래 굴러 모서리가 하나도 없다.", effect: "얇은 보호막을 두른다." },
+  { id: "tin-whistle", name: "양철 호루라기", rarity: "C", flavor: "소리가 크진 않은데 이상하게 멀리 간다.", effect: "적의 표식을 흩고 무너진 자세를 다시 세운다." },
+
+  // --- UC ---
+  { id: "anchor-chalk", name: "정박지 분필", rarity: "UC", flavor: "바닥에 원을 그리면 그 안은 잠시 안전하다.", effect: "균열 안에서 숨을 돌려 체력을 회복한다." },
+  { id: "seconds-thief", name: "초를 훔친 자", rarity: "UC", flavor: "훔친 시간은 돌려줄 방법이 없다.", effect: "반격당하지 않는 행동을 두 번 얻는다." },
+  { id: "vein-glass-lens", name: "유리맥 렌즈", rarity: "UC", flavor: "지하도 벽을 깎아 만든 조악한 렌즈.", effect: "적의 다음 수를 두 단계 더 읽는다." },
+
+  // --- R ---
+  { id: "helgas-coolant", name: "헬가의 냉각제", rarity: "R", flavor: "라벨에 사용량이 두 번 고쳐 적혀 있다.", effect: "범람을 즉시 가라앉히고 얼룩을 크게 줄인다." },
+  { id: "rivs-ledger-page", name: "리브의 장부 한 장", rarity: "R", flavor: "찢어간 걸 알면서도 그는 아무 말 하지 않았다.", effect: "여진화를 얻는다." },
+
+  // --- SR ---
+  { id: "isras-spare-key", name: "이스라의 여벌 열쇠", rarity: "SR", flavor: "\"돌려줄 필요는 없어. 어차피 내 것도 아니었으니까.\"", effect: "균열의 현재 방을 건너뛰며 체력을 회복한다." },
+  { id: "counterflow-vial", name: "역류 유리병", rarity: "SR", flavor: "안쪽에서 바깥으로 흐르는 물이 담겨 있다.", effect: "적에게 큰 피해를 주지만 얼룩이 크게 번진다." },
+
+  // --- SSR ---
+  { id: "morens-blank-page", name: "모른의 백지", rarity: "SSR", flavor: "아무것도 적혀 있지 않은 것이 이 장의 내용이다.", effect: "얼룩과 범람을 지우고 보호막과 완전한 예지를 얻는다." },
 ];

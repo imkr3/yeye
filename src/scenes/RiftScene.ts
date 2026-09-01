@@ -314,7 +314,8 @@ export class RiftScene extends Phaser.Scene {
     const e = choice.effects;
 
     if (e.hp) {
-      const amount = e.hp > 0 ? Math.round(e.hp * mods.healingMultiplier) : e.hp;
+      const amount =
+        e.hp > 0 ? Math.round(e.hp * mods.healingMultiplier) + mods.riftHealBonus : e.hp;
       this.run = amount > 0 ? healRun(this.run, amount) : damageRun(this.run, -amount);
     }
     if (e.stain) state = setStain(state, addStain(state.stain, e.stain));
@@ -547,7 +548,10 @@ export class RiftScene extends Phaser.Scene {
     if (effect.stain) state = setStain(state, addStain(state.stain, effect.stain));
     setState(state);
 
-    if (effect.heal) this.run = healRun(this.run, effect.heal);
+    if (effect.heal) {
+      const mods = relicModifiers(getState().equippedRelics);
+      this.run = healRun(this.run, Math.round(effect.heal * mods.healingMultiplier) + mods.riftHealBonus);
+    }
     if (effect.revealRooms) this.revealedAhead = Math.max(this.revealedAhead, effect.revealRooms);
     if (effect.trapInsight) this.trapInsight = true;
 
