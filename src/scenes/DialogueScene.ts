@@ -120,6 +120,7 @@ export class DialogueScene extends Phaser.Scene {
   private renderNode() {
     this.clearOptions();
     const node = getNode(this.dialogueData.tree, this.currentNodeId);
+    if (node.flagOnEnter) this.dialogueData.onFlag?.(node.flagOnEnter);
     this.speakerText.setText(node.speaker.toUpperCase());
     this.lineText.setText(node.line);
 
