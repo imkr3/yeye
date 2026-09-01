@@ -142,8 +142,6 @@ export class RegionScene extends Phaser.Scene {
         this.onReachSavePoint();
       });
 
-      if (getState().storyFlags.includes(COMPASS_FLAG)) this.createCompass();
-
       if (this.config.nextRegionKey) {
         const exitX = isSidescroll ? worldWidth - 40 : 920;
         const exitY = isSidescroll ? groundY : 300;
@@ -293,6 +291,8 @@ export class RegionScene extends Phaser.Scene {
   private platformColliders: Phaser.GameObjects.Rectangle[] = [];
 
   update(time: number) {
+    if (!this.compass && getState().storyFlags.includes(COMPASS_FLAG)) this.createCompass();
+
     const isSidescroll = this.config.movementMode === "sidescroll";
     const body = this.player.body as Phaser.Physics.Arcade.Body;
 
@@ -322,16 +322,22 @@ export class RegionScene extends Phaser.Scene {
       .setDepth(60);
     this.compass.setData("dial", dial);
     this.add
-      .text(900, 84, "분기점", { fontFamily: "monospace", fontSize: "9px", color: "#6ea78c" })
+      .text(900, 84, this.config.savePoint ? "분기점" : "감지 없음", { fontFamily: "monospace", fontSize: "9px", color: "#6ea78c" })
       .setOrigin(0.5)
       .setScrollFactor(0)
       .setDepth(60);
   }
 
   private updateCompass() {
-    const sp = this.config.savePoint;
-    if (!this.compass || !sp) return;
+    if (!this.compass) return;
     const dial = this.compass.getData("dial") as Phaser.GameObjects.Container;
+    const sp = this.config.savePoint;
+    if (!sp) {
+      // 이 지역에 분기점이 없다 — 바늘이 자리를 못 잡고 계속 돈다.
+      // 아무 일도 일어나지 않는 것보다, 없다는 걸 보여주는 편이 낫다.
+      dial.rotation += 0.05;
+      return;
+    }
     const angle = Phaser.Math.Angle.Between(this.player.x, this.player.y, sp.x, sp.y);
     // 삼각형이 위를 향하도록 그려져 있으므로 90도만큼 되돌린다.
     dial.rotation = Phaser.Math.Angle.RotateTo(dial.rotation, angle + Math.PI / 2, 0.12);
