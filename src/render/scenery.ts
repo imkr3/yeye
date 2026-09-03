@@ -22,7 +22,10 @@ export type SceneryStyle =
   | "anchorage"
   | "boundary-gate"
   | "residue-district"
-  | "aftershock-road";
+  | "aftershock-road"
+  | "sunken-belfry"
+  | "salt-store"
+  | "shallow-ford";
 
 interface SceneryPalette {
   skyTop: number;
@@ -38,6 +41,45 @@ interface SceneryPalette {
 }
 
 const PALETTES: Record<SceneryStyle, SceneryPalette> = {
+  // 가라앉은 종루 — 물에 반쯤 잠긴 종탑. 소리가 울리지 않는 곳.
+  "sunken-belfry": {
+    skyTop: 0x070f14,
+    skyBottom: 0x172c38,
+    fog: 0x2f5566,
+    structure: 0x0f2129,
+    accent: 0x9ac4d4,
+    groundNear: 0x081218,
+    groundFar: 0x1c3742,
+    particle: 0xbfe0ec,
+    rayColor: 0x9fd0e4,
+    rayAlpha: 0.06,
+  },
+  // 소금 창고 — 하얗게 굳은 실내. 유일하게 밝은 지역.
+  "salt-store": {
+    skyTop: 0x1a1a18,
+    skyBottom: 0x3a3a34,
+    fog: 0x6e6c60,
+    structure: 0x2a2a26,
+    accent: 0xe8e4d0,
+    groundNear: 0x1c1c1a,
+    groundFar: 0x44443c,
+    particle: 0xf4f0e0,
+    rayColor: 0xe8e4d0,
+    rayAlpha: 0.07,
+  },
+  // 얕은 여울 — 물이 발목까지만 오는 길. 밝지만 바닥이 안 보인다.
+  "shallow-ford": {
+    skyTop: 0x0a1410,
+    skyBottom: 0x1e3a2c,
+    fog: 0x39705a,
+    structure: 0x14281e,
+    accent: 0x7cc4a0,
+    groundNear: 0x0b1610,
+    groundFar: 0x224434,
+    particle: 0xa8e0c4,
+    rayColor: 0x8fd8b4,
+    rayAlpha: 0.055,
+  },
   // 잔재구 — 무너진 구역. 재와 먼지가 가라앉지 않는다.
   "residue-district": {
     skyTop: 0x0d0b0a,

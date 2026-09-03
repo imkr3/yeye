@@ -373,7 +373,8 @@ function dealToPlayer(state: CombatState, rawAmount: number, kind: ActionKind) {
 
   // 적이 남긴 표식이 있으면 폭발 계열이 증폭된다.
   if (kind === "detonate" && state.enemy.markedPlayer) {
-    amount *= 1.5;
+    // 1.5배는 방어를 해도 넘기기 어려운 한 방이 되어, 표식을 막으라는 힌트와 어긋났다.
+    amount *= 1.32;
     state.enemy.markedPlayer = false;
   }
 

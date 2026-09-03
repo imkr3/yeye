@@ -10,7 +10,8 @@
     "preview": "vite preview",
     "test": "esbuild tests/systems.test.ts --bundle --platform=node --format=esm --outfile=node_modules/.cache/systems.test.mjs --log-level=error && node node_modules/.cache/systems.test.mjs",
     "typecheck": "tsc --noEmit",
-    "test:browser": "node tests/browser.test.mjs"
+    "test:browser": "node tests/browser.test.mjs",
+    "balance": "esbuild tools/balance-sim.ts --bundle --platform=node --format=esm --outfile=node_modules/.cache/balance.mjs --log-level=error && node node_modules/.cache/balance.mjs"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.123.0",

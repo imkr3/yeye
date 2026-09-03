@@ -83,6 +83,7 @@ import { loadJudgeSettings, judgeIsLive, DEFAULT_JUDGE_SETTINGS } from "../src/s
 import { personaOf, NPC_PERSONAS } from "../src/data/dialogues/personas";
 import { RIFTS, buildRiftRun, DEFAULT_RIFT_ID } from "../src/systems/RiftSystem";
 import { RIFT_ENEMIES } from "../src/data/rifts/enemies";
+import { GUARD, PLAYER_BASE } from "../src/data/combat/balance";
 import { REGIONS } from "../src/data/regions";
 import { israDialogue } from "../src/data/dialogues/isra";
 import { rivDialogue } from "../src/data/dialogues/riv";
@@ -320,8 +321,23 @@ check("범람은 지속 턴을 갖는다", overflowCombat.player.overflowTurnsLe
 section("10. 보스 페이즈와 죽음의 기억 힌트");
 
 let boss = createCombat({ enemy: PULSE_COUNTER, memoryTier: 3, playerMaxHp: 600, playerHp: 600 });
-const firstFour = [0, 1, 2, 3].map((i) => PULSE_COUNTER.pattern[i].id);
-check("1페이즈는 표식 → 두드림 → 파열 → 큰 셈 순서", firstFour.join(",") === "count-mark,count-tap,count-burst,count-toll");
+// 위협 두 개가 붙어 있으면 둘 다 막을 수 없어 방어가 함정이 된다.
+// 그래서 파열과 큰 셈 사이에 쉬는 박자를 넣었다.
+const firstFive = [0, 1, 2, 3, 4].map((i) => PULSE_COUNTER.pattern[i].id);
+check(
+  "1페이즈는 표식 → 두드림 → 파열 → 고르기 → 큰 셈 순서",
+  firstFive.join(",") === "count-mark,count-tap,count-burst,count-rest,count-toll",
+  firstFive.join(",")
+);
+const threatIdx = PULSE_COUNTER.pattern
+  .map((a, i) => ({ a, i }))
+  .filter(({ a }) => a.kind === "strong" || a.kind === "detonate")
+  .map(({ i }) => i);
+check(
+  "막을 만한 위협이 연달아 붙어 있지 않다",
+  threatIdx.every((i, n) => n === 0 || i - threatIdx[n - 1] > 1),
+  threatIdx.join(",")
+);
 
 const rng = createRng("boss");
 let guard = 0;
@@ -1029,6 +1045,86 @@ for (let i = 0; i < 3; i++) {
   allyRunB = takeTurn(allyRunB, { id: "guard" }, createRng(`s${i}`));
 }
 check("동료 지원은 무작위가 아니다", allyRunA.player.hp === allyRunB.player.hp);
+
+// ---------------------------------------------------------------------------
+section("26. 밸런스 — 이길 수 없는 적이 없어야 한다");
+
+/*
+ * 시뮬레이터(npm run balance)로 조정한 결과를 여기서 붙잡아 둔다.
+ * 예전에 심층주 두 마리가 승률 0%였다 — 수치만 보면 멀쩡해 보여서 아무도 못 잡았다.
+ * 체력이나 피해를 건드리면 이 테스트가 먼저 걸린다.
+ */
+function simulateWinRate(
+  enemy: typeof GLASS_MITE,
+  policy: (c: ReturnType<typeof createCombat>) => { id: any },
+  runs = 60
+): number {
+  let wins = 0;
+  for (let i = 0; i < runs; i++) {
+    const rng = createRng(`bal:${enemy.id}:${i}`);
+    let c = createCombat({ enemy, memoryTier: 2, playerMaxHp: PLAYER_BASE.maxHp });
+    let guards = 0;
+    while (!c.over && c.turn < 60) {
+      const a = policy(c);
+      if (a.id === "guard") {
+        guards += 1;
+        c = takeTurn(c, guards > 2 ? { id: "basic-strike" } : a, rng);
+      } else {
+        guards = 0;
+        c = takeTurn(c, a, rng);
+      }
+    }
+    if (c.result === "win") wins += 1;
+  }
+  return wins / runs;
+}
+
+const attackOnly = () => ({ id: "basic-strike" as const });
+const skilledPolicy = (c: ReturnType<typeof createCombat>) => {
+  const nextUp = forecastEnemyActions(c, 1)[0];
+  if (canUseLastDitch(c) && c.enemy.hp <= c.enemy.def.maxHp * 0.25) return { id: "last-ditch" as const };
+  if (nextUp && nextUp.kind === "strong") return { id: "guard" as const };
+  if (c.enemy.weakenTurns === 0 && c.turn % 5 === 0) return { id: "read-flow" as const };
+  if (c.enemy.bleedTurns === 0 && c.player.stain < 45) return { id: "vein-open" as const };
+  if (c.player.stain < 70) return { id: "chain-strike" as const };
+  return { id: "basic-strike" as const };
+};
+
+for (const enemy of Object.values(RIFT_ENEMIES)) {
+  const skilledRate = simulateWinRate(enemy, skilledPolicy);
+  check(
+    `${enemy.name}: 숙련자는 확실히 이긴다 (${(skilledRate * 100).toFixed(0)}%)`,
+    skilledRate >= 0.8,
+    `${(skilledRate * 100).toFixed(0)}%`
+  );
+}
+
+// 심층주는 아무렇게나 눌러서 이겨지면 안 된다.
+for (const bossId of ["pulse-counter", "miscount"]) {
+  const boss = RIFT_ENEMIES[bossId];
+  const naiveRate = simulateWinRate(boss, attackOnly);
+  check(
+    `${boss.name}: 때리기만 해서는 반반 이하 (${(naiveRate * 100).toFixed(0)}%)`,
+    naiveRate <= 0.7,
+    `${(naiveRate * 100).toFixed(0)}%`
+  );
+  check(
+    `${boss.name}: 그래도 이길 수는 있다`,
+    naiveRate > 0,
+    `${(naiveRate * 100).toFixed(0)}%`
+  );
+}
+
+// 일반 적은 초심자도 넘어갈 수 있어야 한다 — 진행이 막히면 안 된다.
+for (const id of ["glass-mite", "sutured-pilgrim", "backflow-hound", "threshold-biter"]) {
+  const e = RIFT_ENEMIES[id];
+  check(`${e.name}: 초심자도 통과할 수 있다`, simulateWinRate(e, attackOnly) >= 0.6);
+}
+
+// 방어가 손해인 함정이 되지 않아야 한다.
+check("강공격 방어가 확실히 이득이다", GUARD.strongReduction >= 0.7, `${GUARD.strongReduction}`);
+check("폭발 방어도 최소한의 값은 한다", GUARD.detonateReduction >= 0.25, `${GUARD.detonateReduction}`);
+check("연속 방어 페널티가 방어를 무의미하게 만들지 않는다", GUARD.postureLossPerRepeat < GUARD.strongReduction / 2);
 
 // ---------------------------------------------------------------------------
 console.log(`\n${passed}개 통과, ${failed}개 실패`);

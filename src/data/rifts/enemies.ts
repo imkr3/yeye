@@ -49,7 +49,7 @@ export const GLASS_MITE: EnemyDef = {
 export const SUTURED_PILGRIM: EnemyDef = {
   id: "sutured-pilgrim",
   name: "봉합된 순례자",
-  maxHp: 52,
+  maxHp: 58,
   flavor: "누군가 서둘러 꿰맨 자국이 온몸에 남아 있다. 아직 걷고 있다.",
   pattern: [
     { id: "unseam", label: "봉합 풀기", telegraph: "실밥이 툭 끊어진다", kind: "guardbreak", damage: [7, 10] },
@@ -67,7 +67,7 @@ export const SUTURED_PILGRIM: EnemyDef = {
 export const BACKFLOW_HOUND: EnemyDef = {
   id: "backflow-hound",
   name: "역류 사냥개",
-  maxHp: 44,
+  maxHp: 52,
   flavor: "지나간 자리를 거꾸로 되짚으며 냄새를 맡는다.",
   pattern: [
     { id: "scent", label: "표식 남기기", telegraph: "허공에 코를 박고 자국을 새긴다", kind: "mark", damage: [0, 0] },
@@ -85,18 +85,26 @@ export const BACKFLOW_HOUND: EnemyDef = {
 export const PULSE_COUNTER: EnemyDef = {
   id: "pulse-counter",
   name: "맥동을 세는 자",
-  maxHp: 138,
+  maxHp: 100,
   phaseTwoAt: 0.45,
   flavor: "무엇을 세는지는 알 수 없지만, 당신의 박동에 맞춰 손가락을 접는다.",
+  /*
+   * 위협 두 개(파열·마지막 셈)를 붙여 두면 둘 다 막을 수가 없다 — 연속 방어는
+   * 자세가 무너져 감소율이 깎이고, 두 턴을 통째로 잃어 화력이 반토막 난다.
+   * 시뮬레이터에서 패턴을 외우고 둘 다 막는 쪽이 승률 0%가 나왔다. 기억 힌트는
+   * 막으라고 하는데 수치는 막는 쪽을 벌하고 있었다.
+   * 사이에 약공격을 한 박자 넣어, 막고 → 치고 → 막을 수 있게 했다.
+   */
   pattern: [
     { id: "count-mark", label: "박동 표식", telegraph: "손가락 하나를 접는다", kind: "mark", damage: [0, 0] },
-    { id: "count-tap", label: "셈 두드리기", telegraph: "손끝으로 허공을 두드린다", kind: "weak", damage: [7, 11] },
-    { id: "count-burst", label: "표식 파열", telegraph: "접힌 손가락이 펴진다", kind: "detonate", damage: [17, 24] },
-    { id: "count-toll", label: "마지막 셈", telegraph: "양손을 크게 벌린다", kind: "strong", damage: [19, 26] },
+    { id: "count-tap", label: "셈 두드리기", telegraph: "손끝으로 허공을 두드린다", kind: "weak", damage: [6, 10] },
+    { id: "count-burst", label: "표식 파열", telegraph: "접힌 손가락이 펴진다", kind: "detonate", damage: [9, 13] },
+    { id: "count-rest", label: "박자 고르기", telegraph: "손을 잠깐 내린다", kind: "weak", damage: [5, 8] },
+    { id: "count-toll", label: "마지막 셈", telegraph: "양손을 크게 벌린다", kind: "strong", damage: [15, 20] },
   ],
   memoryHints: [
     "손가락을 접은 다음에 무언가 터졌다.",
-    "표식 → 두드림 → 파열 → 큰 셈 순서로 돈다.",
+    "표식 → 두드림 → 파열 → 고르기 → 큰 셈 순서로 돈다. 위협 사이에 한 박자 쉰다.",
     "체력이 절반 아래로 떨어지면 직전 두 행동 중 하나를 거꾸로 되풀이한다.",
   ],
 };
@@ -110,7 +118,7 @@ export const PULSE_COUNTER: EnemyDef = {
 export const SALT_WEEPER: EnemyDef = {
   id: "salt-weeper",
   name: "소금 우는 것",
-  maxHp: 58,
+  maxHp: 66,
   flavor: "울음이 멎을 때마다 상처가 소금으로 메워진다.",
   pattern: [
     { id: "brine-lash", label: "소금 채찍", telegraph: "젖은 팔을 뒤로 젖힌다", kind: "weak", damage: [6, 9] },
@@ -128,7 +136,7 @@ export const SALT_WEEPER: EnemyDef = {
 export const THRESHOLD_BITER: EnemyDef = {
   id: "threshold-biter",
   name: "문턱을 무는 것",
-  maxHp: 46,
+  maxHp: 54,
   flavor: "문지방에 이빨 자국이 잔뜩 남아 있다. 안으로는 들어오지 않는다.",
   pattern: [
     { id: "gnaw", label: "갉기", telegraph: "턱을 낮게 문다", kind: "weak", damage: [5, 8] },
@@ -147,7 +155,7 @@ export const THRESHOLD_BITER: EnemyDef = {
 export const TWICE_TURNING_NEEDLE: EnemyDef = {
   id: "twice-turning-needle",
   name: "두 번 도는 바늘",
-  maxHp: 52,
+  maxHp: 60,
   flavor: "시계 바늘 하나가 같은 자리를 두 번 지난다.",
   pattern: [
     { id: "prick", label: "찌르기", telegraph: "바늘 끝이 당신을 향한다", kind: "weak", damage: [4, 7] },
@@ -165,7 +173,7 @@ export const TWICE_TURNING_NEEDLE: EnemyDef = {
 export const STAIN_MIDWIFE: EnemyDef = {
   id: "stain-midwife",
   name: "얼룩 산파",
-  maxHp: 64,
+  maxHp: 72,
   flavor: "무언가를 받아내는 자세로 웅크리고 있다. 받아낼 것은 당신 쪽에서 나온다.",
   pattern: [
     { id: "smear", label: "문지르기", telegraph: "손바닥을 펼쳐 다가온다", kind: "weak", damage: [5, 8] },
@@ -184,11 +192,11 @@ export const STAIN_MIDWIFE: EnemyDef = {
 export const ANCHORAGE_DROWNED: EnemyDef = {
   id: "anchorage-drowned",
   name: "정박지의 익사자",
-  maxHp: 70,
+  maxHp: 58,
   flavor: "물을 잔뜩 먹은 채로 아직 걷는다. 서두르는 법이 없다.",
   pattern: [
     { id: "drag", label: "끌어당기기", telegraph: "젖은 손이 발목을 더듬는다", kind: "weak", damage: [6, 10] },
-    { id: "hold-under", label: "물속에 누르기", telegraph: "숨을 크게 들이켠다", kind: "strong", damage: [20, 27] },
+    { id: "hold-under", label: "물속에 누르기", telegraph: "숨을 크게 들이켠다", kind: "strong", damage: [15, 21] },
     { id: "drift", label: "떠오르기", telegraph: "몸이 잠깐 위로 뜬다", kind: "recover", damage: [0, 0] },
   ],
   memoryHints: [
@@ -202,15 +210,15 @@ export const ANCHORAGE_DROWNED: EnemyDef = {
 export const MISCOUNT: EnemyDef = {
   id: "miscount",
   name: "셈이 틀린 것",
-  maxHp: 132,
+  maxHp: 92,
   phaseTwoAt: 0.5,
   flavor: "무엇을 세고 있었는지 스스로도 잊은 채, 아직 세고 있다.",
   pattern: [
-    { id: "tally", label: "헤아리기", telegraph: "손가락을 하나씩 접는다", kind: "weak", damage: [7, 11] },
+    { id: "tally", label: "헤아리기", telegraph: "손가락을 하나씩 접는다", kind: "weak", damage: [5, 9] },
     { id: "miscount-mark", label: "잘못 센 자리", telegraph: "당신을 가리키며 숫자를 건너뛴다", kind: "mark", damage: [0, 0] },
-    { id: "carry-over", label: "받아올림", telegraph: "접었던 손가락이 전부 펴진다", kind: "detonate", damage: [17, 23] },
+    { id: "carry-over", label: "받아올림", telegraph: "접었던 손가락이 전부 펴진다", kind: "detonate", damage: [10, 14] },
     { id: "recount", label: "다시 세기", telegraph: "처음부터 세기 시작한다", kind: "recover", damage: [0, 0] },
-    { id: "wrong-sum", label: "틀린 합", telegraph: "숫자가 맞지 않는다는 듯 고개를 젓는다", kind: "guardbreak", damage: [16, 21] },
+    { id: "wrong-sum", label: "틀린 합", telegraph: "숫자가 맞지 않는다는 듯 고개를 젓는다", kind: "guardbreak", damage: [13, 18] },
   ],
   memoryHints: [
     "숫자를 건너뛴 다음이 위험했다.",
@@ -236,7 +244,7 @@ export const RIFT_ENEMIES: Record<string, EnemyDef> = {
 export const STAIRWELL_WRECKAGE: EnemyDef = {
   id: "stairwell-wreckage",
   name: "무너진 잔해",
-  maxHp: 40,
+  maxHp: 46,
   flavor: "무너진 계단참이 아직 무너지는 중이다.",
   pattern: [
     { id: "slip", label: "가벼운 붕괴", telegraph: "돌 부스러기가 흘러내린다", kind: "weak", damage: [5, 9] },
