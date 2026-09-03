@@ -60,6 +60,28 @@ import { pullOnce, pullFive, PITY_THRESHOLD, DUPLICATE_DUST, rarityOdds, priceFo
 import { CONSUMABLE_POOL } from "../src/data/items/consumables";
 import { RELIC_POOL } from "../src/data/items/relics";
 import { schoolOf } from "../src/data/economy/schools";
+import {
+  adjustAffinity,
+  affinityOf,
+  stageFor,
+  stageOf,
+  isAlly,
+  isHostile,
+  allyCount,
+  hostileCount,
+  allyFlag,
+  hostileFlag,
+  ALLY_LOCK,
+  HOSTILE_LOCK,
+  AFFINITY_MAX,
+  AFFINITY_MIN,
+} from "../src/systems/AffinitySystem";
+import { KeywordJudge } from "../src/systems/dialogue/KeywordJudge";
+import { allowedBranches } from "../src/systems/dialogue/JudgeTypes";
+import { loadJudgeSettings, judgeIsLive, DEFAULT_JUDGE_SETTINGS } from "../src/systems/dialogue/JudgeSettings";
+import { personaOf, NPC_PERSONAS } from "../src/data/dialogues/personas";
+import { RIFTS, buildRiftRun, DEFAULT_RIFT_ID } from "../src/systems/RiftSystem";
+import { RIFT_ENEMIES } from "../src/data/rifts/enemies";
 import { REGIONS } from "../src/data/regions";
 import { israDialogue } from "../src/data/dialogues/isra";
 import { rivDialogue } from "../src/data/dialogues/riv";
@@ -784,6 +806,120 @@ let discountState = fresh();
 discountState = { ...discountState, equippedRelics: ["counters-abacus"], storyFlags: [MARKET_TIPOFF_FLAG] };
 check("할인을 모두 겹쳐도 값은 1 이상이다", priceFor(1, discountState) >= 1);
 check("할인이 겹치면 실제로 싸진다", priceFor(PRICES.singlePull, discountState) < PRICES.singlePull);
+
+// ---------------------------------------------------------------------------
+section("20. 호감도가 관계 단계와 결말까지 이어진다");
+
+check("0은 중립이다", stageOf(0) === "neutral");
+check("경계와 적대가 나뉜다", stageOf(-40) === "wary" && stageOf(-80) === "hostile");
+check("우호와 동료가 나뉜다", stageOf(30) === "friendly" && stageOf(70) === "ally");
+
+let rel = fresh();
+const warm = adjustAffinity(rel, "isra", 30);
+check("호감도가 오르면 단계가 바뀐다", warm.stageAfter === "friendly", warm.stageAfter);
+check("변화 전 단계도 함께 알려준다", warm.stageBefore === "neutral");
+check("아직 굳지는 않았다", warm.locked === null);
+
+// 동료 확정
+let ally = adjustAffinity(warm.state, "isra", 50).state;
+check("임계치를 넘으면 동료로 굳는다", isAlly(ally, "isra"));
+check("동료 플래그가 세워진다", ally.storyFlags.includes(allyFlag("isra")));
+check("동료 수가 세어진다", allyCount(ally) === 1);
+
+// 굳은 관계는 잘 깨지지 않는다.
+const nicked = adjustAffinity(ally, "isra", -20);
+check("동료는 한 번의 실수로 깨지지 않는다", isAlly(nicked.state, "isra"), `${nicked.after}`);
+check("그래도 호감도 자체는 줄어든다", nicked.after < affinityOf(ally, "isra"));
+
+// 적대 확정
+let foe = adjustAffinity(fresh(), "riv", -80).state;
+check("아래로도 굳는다", isHostile(foe, "riv"));
+check("적대 플래그가 세워진다", foe.storyFlags.includes(hostileFlag("riv")));
+check("적대 수가 세어진다", hostileCount(foe) === 1);
+check("적대와 동료 플래그가 동시에 서지 않는다", !foe.storyFlags.includes(allyFlag("riv")));
+
+// 범위를 벗어나지 않는다.
+const capped = adjustAffinity(fresh(), "helga", 999);
+check("호감도 상한을 넘지 않는다", capped.after === AFFINITY_MAX, `${capped.after}`);
+const floored = adjustAffinity(fresh(), "helga", -999);
+check("호감도 하한 아래로 내려가지 않는다", floored.after === AFFINITY_MIN, `${floored.after}`);
+check("확정 임계치가 범위 안에 있다", ALLY_LOCK < AFFINITY_MAX && HOSTILE_LOCK > AFFINITY_MIN);
+
+// 결말이 관계를 반영한다.
+let twoAllies = adjustAffinity(fresh(), "isra", 80).state;
+twoAllies = adjustAffinity(twoAllies, "riv", 80).state;
+check("동료가 둘이면 함께 지는 결말로 간다", resolveEnding(twoAllies).id === "carried-together");
+
+let allHostile = adjustAffinity(fresh(), "isra", -80).state;
+allHostile = adjustAffinity(allHostile, "riv", -80).state;
+check("전부 적대하면 아무도 남지 않는 결말", resolveEnding(allHostile).id === "no-one-left");
+check("동료가 하나라도 있으면 그 결말은 아니다", resolveEnding(adjustAffinity(allHostile, "helga", 80).state).id !== "no-one-left");
+
+// ---------------------------------------------------------------------------
+section("21. 대화 판정기");
+
+const judge = new KeywordJudge();
+const freeNode = Object.values(israDialogue.nodes).find((n) => n.freeText)!;
+check("자유 입력 노드를 찾았다", !!freeNode);
+check("고를 수 있는 갈래가 있다", allowedBranches(freeNode).length > 0);
+check("기본 갈래도 후보에 포함된다", allowedBranches(freeNode).some((b) => b.next === freeNode.freeText!.fallback.next));
+check("선택지 노드에는 갈래가 없다", allowedBranches(israDialogue.nodes[israDialogue.startNode]).length === 0);
+
+const verdict = await judge.judge({
+  playerLine: "잘 모르겠습니다. 솔직히 말하면요.",
+  node: freeNode,
+  persona: personaOf("isra"),
+  affinity: 0,
+  history: [],
+});
+check("판정기가 갈래를 돌려준다", allowedBranches(freeNode).some((b) => b.next === verdict.next), verdict.next);
+check("규칙 판정이라고 표시된다", verdict.source === "keyword");
+check("호감도 변화량이 숫자다", Number.isFinite(verdict.affinityDelta));
+
+// 인물의 상처를 건드리면 금기로 읽혀야 한다.
+const woundNode = Object.values(borrowedFaceDialogue.nodes).find((n) => n.freeText)!;
+const lethalTest = await judge.judge({
+  playerLine: "내 이름은 노아입니다",
+  node: woundNode,
+  persona: personaOf("borrowed-face"),
+  affinity: 0,
+  history: [],
+});
+check("이름을 주면 치명적 판정이 나온다", !!lethalTest.lethal, JSON.stringify(lethalTest));
+
+// 모든 NPC에 성격표가 있어야 판정기가 근거를 갖는다.
+const npcIdsInTrees = ["isra", "riv", "helga", "moren", "borrowed-face", "silent-pilgrim", "counting-mouth", "ash-bearer"];
+const missingPersona = npcIdsInTrees.filter((id) => !personaOf(id));
+check("모든 NPC에 성격표가 있다", missingPersona.length === 0, missingPersona.join(", "));
+check("사람이 아닌 상대가 표시되어 있다", NPC_PERSONAS["borrowed-face"].inhuman === true);
+
+// 키가 없으면 절대 언어모델을 부르지 않는다 — 공개 빌드의 기본값.
+check("기본 설정은 오프라인이다", DEFAULT_JUDGE_SETTINGS.mode === "offline");
+check("기본 설정에 키가 없다", DEFAULT_JUDGE_SETTINGS.apiKey === "");
+check("키·프록시가 없으면 호출하지 않는다", !judgeIsLive({ ...DEFAULT_JUDGE_SETTINGS, mode: "claude" }));
+check("키가 있으면 호출 가능 상태가 된다", judgeIsLive({ ...DEFAULT_JUDGE_SETTINGS, mode: "claude", apiKey: "sk-test" }));
+check("프록시만 있어도 호출 가능하다", judgeIsLive({ ...DEFAULT_JUDGE_SETTINGS, mode: "claude", proxyUrl: "https://x/" }));
+check("오프라인 모드면 키가 있어도 호출하지 않는다", !judgeIsLive({ ...DEFAULT_JUDGE_SETTINGS, apiKey: "sk-test" }));
+
+// ---------------------------------------------------------------------------
+section("22. 두 번째 균열과 새 적");
+
+check("균열이 둘 이상 등록되어 있다", Object.keys(RIFTS).length >= 2, Object.keys(RIFTS).join(", "));
+const anchorRun = buildRiftRun("seed-a", 68, "sunken-anchorage");
+check("잠긴 정박지로 들어갈 수 있다", anchorRun.riftId === "sunken-anchorage");
+check("두 균열의 방 구성이 다르다", buildRiftRun("seed-a", 68, DEFAULT_RIFT_ID).rooms[1].id !== anchorRun.rooms[1].id);
+check("같은 시드는 같은 배치를 준다", buildRiftRun("seed-a", 68, "sunken-anchorage").rooms.map(r=>r.id).join() === anchorRun.rooms.map(r=>r.id).join());
+check("모르는 균열 id는 기본 균열로 떨어진다", buildRiftRun("s", 68, "없는-균열").riftId === DEFAULT_RIFT_ID);
+check("정박지 심층주가 마지막 방이다", anchorRun.rooms[anchorRun.rooms.length - 1].type === "boss");
+
+// 적 정의의 무결성 — 패턴이 비면 전투가 멈춘다.
+const enemies = Object.values(RIFT_ENEMIES);
+check("적이 10종 이상이다", enemies.length >= 10, `${enemies.length}종`);
+check("모든 적에 행동 패턴이 있다", enemies.every((e) => e.pattern.length > 0));
+check("모든 적에 기억 힌트가 3단계 있다", enemies.every((e) => e.memoryHints.length === 3));
+check("적 id가 전부 고유하다", new Set(enemies.map((e) => e.id)).size === enemies.length);
+check("피해 범위가 뒤집힌 행동이 없다", enemies.every((e) => e.pattern.every((a) => a.damage[0] <= a.damage[1])));
+check("모든 행동에 예비동작 묘사가 있다", enemies.every((e) => e.pattern.every((a) => a.telegraph.length > 0)));
 
 // ---------------------------------------------------------------------------
 console.log(`\n${passed}개 통과, ${failed}개 실패`);

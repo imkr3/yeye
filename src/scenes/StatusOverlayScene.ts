@@ -1,6 +1,7 @@
 import Phaser from "phaser";
 import type { RegressionState } from "../systems/RegressionSystem";
 import { getState, gameEvents } from "../state/gameState";
+import { STAGE_LABEL, stageFor } from "../systems/AffinitySystem";
 
 /**
  * 무한 서약 상태창 오버레이. 설계 문서 01.1 "초기 상태창" 참고.
@@ -87,9 +88,15 @@ export class StatusOverlayScene extends Phaser.Scene {
         "누적 페널티:",
         penalties,
         "",
-        "NPC 신뢰:",
+        "관계:",
         Object.keys(state.npcTrust).length
-          ? Object.entries(state.npcTrust).map(([id, v]) => `- ${id}: ${v > 0 ? "+" : ""}${v}`).join("\n")
+          ? Object.keys(state.npcTrust)
+              .map((id) => {
+                const stage = stageFor(state, id);
+                const v = state.npcTrust[id] ?? 0;
+                return `- ${id}: ${STAGE_LABEL[stage]} (${v > 0 ? "+" : ""}${v})`;
+              })
+              .join("\n")
           : "없음",
         "",
         `파편(POINT): ${state.fragments}`,

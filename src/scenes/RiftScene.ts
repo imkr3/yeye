@@ -53,9 +53,9 @@ export class RiftScene extends Phaser.Scene {
     super("RiftScene");
   }
 
-  init() {
+  init(data?: { riftId?: string }) {
     const state = getState();
-    this.run = buildRiftRun(state.runSeed, PLAYER_BASE.maxHp);
+    this.run = buildRiftRun(state.runSeed, PLAYER_BASE.maxHp, data?.riftId);
     this.busy = false;
     // 「부식된 지도첩」을 걸어두면 처음부터 전부 드러난다.
     this.revealedAhead = relicModifiers(state.equippedRelics).revealRooms ? 99 : 0;

@@ -1,5 +1,16 @@
 import { createRng } from "./Rng";
 import { GLASSVEIN_UNDERWAY, type RiftRoomDef } from "../data/rifts/glassvein";
+import { SUNKEN_ANCHORAGE } from "../data/rifts/anchorage";
+
+/** 균열 하나의 정의. 방 후보만 다르고 진행 규칙은 공통이다. */
+export type RiftDef = typeof GLASSVEIN_UNDERWAY;
+
+export const RIFTS: Record<string, RiftDef> = {
+  [GLASSVEIN_UNDERWAY.id]: GLASSVEIN_UNDERWAY,
+  [SUNKEN_ANCHORAGE.id]: SUNKEN_ANCHORAGE as unknown as RiftDef,
+};
+
+export const DEFAULT_RIFT_ID = GLASSVEIN_UNDERWAY.id;
 
 /**
  * 균열 진행 — 시드 기반 방 순서 조합.
@@ -28,8 +39,12 @@ export interface RiftRun {
 }
 
 /** 시드에서 방 순서를 결정한다. 같은 시드 → 항상 같은 결과. */
-export function buildRiftRun(seed: string, playerMaxHp: number): RiftRun {
-  const rift = GLASSVEIN_UNDERWAY;
+export function buildRiftRun(
+  seed: string,
+  playerMaxHp: number,
+  riftId: string = DEFAULT_RIFT_ID
+): RiftRun {
+  const rift = RIFTS[riftId] ?? RIFTS[DEFAULT_RIFT_ID];
   const rng = createRng(`${seed}:${rift.id}`);
 
   // 일반 방 2개는 전투와 함정 후보를 섞어서 뽑는다.

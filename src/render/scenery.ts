@@ -18,7 +18,9 @@ export type SceneryStyle =
   | "ash-market"
   | "frost-observatory"
   | "endless-stairs"
-  | "glassvein-underway";
+  | "glassvein-underway"
+  | "anchorage"
+  | "boundary-gate";
 
 interface SceneryPalette {
   skyTop: number;
@@ -34,6 +36,32 @@ interface SceneryPalette {
 }
 
 const PALETTES: Record<SceneryStyle, SceneryPalette> = {
+  // 정박지 — 물이 빠지지 않는 항구. 청록보다 탁하고 무겁게.
+  anchorage: {
+    skyTop: 0x060d12,
+    skyBottom: 0x14262f,
+    fog: 0x2b4a56,
+    structure: 0x102028,
+    accent: 0x6fa8b8,
+    groundNear: 0x081216,
+    groundFar: 0x1a323c,
+    particle: 0xa8d4e0,
+    rayColor: 0x8fc8d8,
+    rayAlpha: 0.045,
+  },
+  // 경계문 — 색이 거의 빠진 곳. 문 하나만 붉게 남았다.
+  "boundary-gate": {
+    skyTop: 0x0a0a0c,
+    skyBottom: 0x1e1c22,
+    fog: 0x3e3a44,
+    structure: 0x17161b,
+    accent: 0xb85a66,
+    groundNear: 0x0a0a0c,
+    groundFar: 0x26242b,
+    particle: 0xd8ccd4,
+    rayColor: 0xc88a92,
+    rayAlpha: 0.05,
+  },
   "sunken-corridor": {
     skyTop: 0x07120f,
     skyBottom: 0x16302a,

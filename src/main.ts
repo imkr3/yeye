@@ -11,6 +11,7 @@ import { InventoryScene } from "./scenes/InventoryScene";
 import { RiftScene } from "./scenes/RiftScene";
 import { ExchangeScene } from "./scenes/ExchangeScene";
 import { SettingsScene } from "./scenes/SettingsScene";
+import { JudgeSettingsScene } from "./scenes/JudgeSettingsScene";
 import { RegressionSummaryScene } from "./scenes/RegressionSummaryScene";
 
 const config: Phaser.Types.Core.GameConfig = {
@@ -31,7 +32,7 @@ const config: Phaser.Types.Core.GameConfig = {
     default: "arcade",
     arcade: { debug: false },
   },
-  scene: [BootScene, RegionScene, StatusOverlayScene, DialogueScene, EndingScene, CombatScene, ToastScene, GachaScene, InventoryScene, RiftScene, RegressionSummaryScene, ExchangeScene, SettingsScene],
+  scene: [BootScene, RegionScene, StatusOverlayScene, DialogueScene, EndingScene, CombatScene, ToastScene, GachaScene, InventoryScene, RiftScene, RegressionSummaryScene, ExchangeScene, SettingsScene, JudgeSettingsScene],
 };
 
 const game = new Phaser.Game(config);
