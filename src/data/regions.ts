@@ -8,6 +8,9 @@ import { borrowedFaceDialogue } from "./dialogues/borrowed-face";
 import { countingMouthDialogue } from "./dialogues/counting-mouth";
 import { silentPilgrimDialogue } from "./dialogues/silent-pilgrim";
 import { ashBearerDialogue } from "./dialogues/ash-bearer";
+import { saltWardenDialogue } from "./dialogues/salt-warden";
+import { quitCounterDialogue } from "./dialogues/quit-counter";
+import { returnedNameDialogue } from "./dialogues/returned-name";
 
 export interface RegionNpcConfig {
   id: string;
@@ -196,7 +199,18 @@ export const REGIONS: Record<string, RegionConfig> = {
       { id: "anchorage-pier-1", x: 300, y: 180, fragmentReward: 12 },
       { id: "anchorage-pier-2", x: 820, y: 380, fragmentReward: 18 },
     ],
-    npcs: [],
+    npcs: [
+      // 동료가 될 수 있는 인물. 친절보다 쓸모를 본다.
+      {
+        id: "salt-warden",
+        label: "소금 관리인",
+        x: 640,
+        y: 250,
+        color: 0x6fa8b8,
+        shape: "diamond",
+        dialogue: saltWardenDialogue,
+      },
+    ],
     sideExits: [
       { x: 120, y: 550, toRegionKey: "ash-market", label: "재의 시장으로 돌아가기" },
       { x: 860, y: 550, toRegionKey: "boundary-gate", label: "곁길: 경계문 앞" },
@@ -229,8 +243,80 @@ export const REGIONS: Record<string, RegionConfig> = {
       { id: "boundary-ledge-1", x: 620, y: 300, fragmentReward: 14 },
       { id: "boundary-ledge-2", x: 1600, y: 290, fragmentReward: 20 },
     ],
+    npcs: [
+      // 네 번째 죽는 방식: 거짓말하면 죽는다. 앞에서 배운 습관이 여기서는 함정이 된다.
+      {
+        id: "returned-name",
+        label: "문 앞에 선 것",
+        x: 2180,
+        y: 420,
+        color: 0xb85a66,
+        shape: "dual-ring",
+        dialogue: returnedNameDialogue,
+      },
+    ],
+    sideExits: [
+      { x: 60, y: 420, toRegionKey: "anchorage", label: "정박지로 돌아가기" },
+      { x: 2340, y: 420, toRegionKey: "residue-district", label: "문 너머: 잔재구" },
+    ],
+  },
+
+  // 잔재구 — 문 너머의 무너진 구역. 정보를 주는 인물이 있는 허브.
+  "residue-district": {
+    key: "residue-district",
+    title: "잔재구",
+    backgroundColor: 0x241f1b,
+    movementMode: "topdown",
+    playerStart: { x: 80, y: 300 },
+    pickups: [
+      { id: "residue-rubble-1", x: 340, y: 180, fragmentReward: 16 },
+      { id: "residue-rubble-2", x: 700, y: 460, fragmentReward: 22 },
+    ],
+    npcs: [
+      {
+        id: "quit-counter",
+        label: "손가락을 세는 사람",
+        x: 480,
+        y: 300,
+        color: 0xbfa87e,
+        shape: "zigzag",
+        dialogue: quitCounterDialogue,
+      },
+    ],
+    sideExits: [
+      { x: 80, y: 550, toRegionKey: "boundary-gate", label: "경계문 앞으로" },
+      { x: 880, y: 550, toRegionKey: "aftershock-road", label: "곁길: 여진로" },
+    ],
+    exchangePost: { x: 820, y: 180, label: "환로 (잔재)" },
+  },
+
+  // 여진로 — 아직 흔들리는 선형 구간. 전투 함정이 있는 파밍 루프.
+  "aftershock-road": {
+    key: "aftershock-road",
+    title: "여진로",
+    backgroundColor: 0x1a1626,
+    movementMode: "sidescroll",
+    worldWidth: 2200,
+    groundY: 420,
+    playerStart: { x: 70, y: 380 },
+    hazard: {
+      x: 1080,
+      y: 420,
+      w: 60,
+      h: 40,
+      label: "무너진 길목 (닿으면 전투)",
+      combat: { encounterId: "threshold-biter", enemyName: "문턱을 무는 것", enemyMaxHp: 46 },
+    },
+    platforms: [
+      { x: 560, y: 330, w: 130, h: 16 },
+      { x: 1500, y: 320, w: 130, h: 16 },
+    ],
+    pickups: [
+      { id: "aftershock-ledge-1", x: 560, y: 300, fragmentReward: 18 },
+      { id: "aftershock-ledge-2", x: 1500, y: 290, fragmentReward: 24 },
+    ],
     npcs: [],
-    sideExits: [{ x: 60, y: 420, toRegionKey: "anchorage", label: "정박지로 돌아가기" }],
+    sideExits: [{ x: 60, y: 420, toRegionKey: "residue-district", label: "잔재구로 돌아가기" }],
   },
 };
 

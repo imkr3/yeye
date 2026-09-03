@@ -1,7 +1,17 @@
 import type { EnemyDef, EnemyAction, ActionKind } from "../data/rifts/enemies";
-import { CAUSAL_MARK, GUARD, OVERFLOW, PLAYER_BASE, SUNDER } from "../data/combat/balance";
+import {
+  CAUSAL_MARK,
+  CHAIN_STRIKE,
+  GUARD,
+  OVERFLOW,
+  PLAYER_BASE,
+  READ_FLOW,
+  SUNDER,
+  VEIN_OPEN,
+} from "../data/combat/balance";
 import { createSystemRng, type Rng } from "./Rng";
 import { addStain, stainStatus } from "./StainSystem";
+import { allyDefsFor, type AllyDef } from "../data/combat/allies";
 import { NEUTRAL_MODIFIERS, applyCombatConsumable, type RelicModifiers } from "./EffectRegistry";
 
 /**
@@ -18,7 +28,16 @@ import { NEUTRAL_MODIFIERS, applyCombatConsumable, type RelicModifiers } from ".
  * - 죽음의 기억 단계가 적의 의도를 얼마나 정확히 보여줄지 결정한다.
  */
 
-export type PlayerActionId = "basic-strike" | "guard" | "causal-mark" | "sunder" | "last-ditch" | "use-item";
+export type PlayerActionId =
+  | "basic-strike"
+  | "guard"
+  | "causal-mark"
+  | "sunder"
+  | "last-ditch"
+  | "use-item"
+  | "chain-strike"
+  | "read-flow"
+  | "vein-open";
 
 export interface PlayerAction {
   id: PlayerActionId;
@@ -53,6 +72,11 @@ export interface CombatEnemyState {
   /** 페이즈 2에서 직전 행동을 거꾸로 되풀이할 차례인지. */
   reverseDue: boolean;
   history: string[];
+  /** 출혈 — 턴 끝마다 고정 피해를 입는다. */
+  bleedTurns: number;
+  bleedPerTurn: number;
+  /** 약화 — 적이 주는 피해가 줄어든다. */
+  weakenTurns: number;
 }
 
 export interface CombatState {
@@ -78,6 +102,8 @@ export interface CombatState {
   modifiers: RelicModifiers;
   /** 얼룩 상승으로 벌어들인 파편 (유물 효과). */
   fragmentsEarned: number;
+  /** 함께 싸우는 동료들. 호감도가 동료 단계까지 오른 인물만 들어온다. */
+  allies: AllyDef[];
 }
 
 export interface CombatSetup {
@@ -88,6 +114,8 @@ export interface CombatSetup {
   stain?: number;
   isBoss?: boolean;
   modifiers?: RelicModifiers;
+  /** 동료로 굳은 NPC id 목록. */
+  allies?: readonly string[];
 }
 
 export function createCombat(setup: CombatSetup): CombatState {
@@ -111,6 +139,9 @@ export function createCombat(setup: CombatSetup): CombatState {
       patternIndex: 0,
       phase: 1,
       markedPlayer: false,
+      bleedTurns: 0,
+      bleedPerTurn: 0,
+      weakenTurns: 0,
       reverseDue: false,
       history: [],
     },
@@ -123,6 +154,7 @@ export function createCombat(setup: CombatSetup): CombatState {
     overflowResidue: false,
     modifiers,
     fragmentsEarned: 0,
+    allies: allyDefsFor(setup.allies ?? []),
   };
 }
 
@@ -145,6 +177,50 @@ export function plannedEnemyAction(state: CombatState, rng?: Rng): EnemyAction {
  * 앞으로의 적 행동을 미리 계산한다 (표시용, 난수 없이 결정적으로).
  * 실제 진행에 영향을 주지 않으며, UI가 행동 순서를 보여주는 데만 쓴다.
  */
+/**
+ * 동료가 이번 턴에 끼어드는지 판정하고 효과를 적용한다.
+ * 각자 주기가 달라서, 언제 도움이 오는지 세는 것도 전투의 일부가 된다.
+ */
+function applyAllySupport(state: CombatState) {
+  for (const ally of state.allies) {
+    if (state.turn === 0 || state.turn % ally.everyTurns !== 0) continue;
+    switch (ally.kind) {
+      case "damage": {
+        const dealt = dealToEnemy(state, ally.amount);
+        pushLog(state, `${ally.line} (${dealt}의 피해)`);
+        break;
+      }
+      case "heal": {
+        const healed = Math.min(ally.amount, state.player.maxHp - state.player.hp);
+        state.player.hp += healed;
+        pushLog(state, `${ally.line} (체력 ${healed} 회복)`);
+        break;
+      }
+      case "shield": {
+        state.player.shield += ally.amount;
+        pushLog(state, `${ally.line} (보호막 ${ally.amount})`);
+        break;
+      }
+      case "cleanse": {
+        state.player.stain = addStain(state.player.stain, -ally.amount);
+        pushLog(state, `${ally.line} (얼룩 ${ally.amount} 감소)`);
+        break;
+      }
+      case "reveal": {
+        const before = state.memoryTier;
+        state.memoryTier = Math.min(3, state.memoryTier + ally.amount);
+        if (state.memoryTier > before) pushLog(state, `${ally.line} (다음 수가 드러난다)`);
+        break;
+      }
+      case "weaken": {
+        state.enemy.weakenTurns = Math.max(state.enemy.weakenTurns, ally.amount);
+        pushLog(state, `${ally.line} (${ally.amount}턴 약화)`);
+        break;
+      }
+    }
+  }
+}
+
 export function forecastEnemyActions(state: CombatState, count: number): EnemyAction[] {
   const pattern = state.enemy.def.pattern;
   const forecast: EnemyAction[] = [];
@@ -430,6 +506,38 @@ export function takeTurn(
       }
       break;
     }
+    case "chain-strike": {
+      next.player.consecutiveGuards = 0;
+      applyStain(next, CHAIN_STRIKE.stainCost, overflow);
+      let total = 0;
+      // 두 번 따로 들어간다 — 보호막이나 경감을 각각 통과한다.
+      for (let i = 0; i < CHAIN_STRIKE.hits; i++) {
+        if (next.enemy.hp <= 0) break;
+        total += dealToEnemy(next, roll(rng, CHAIN_STRIKE.damage));
+      }
+      pushLog(next, `연격 — ${CHAIN_STRIKE.hits}회, 합계 ${total}의 피해.`);
+      break;
+    }
+    case "read-flow": {
+      next.player.consecutiveGuards = 0;
+      next.enemy.weakenTurns = READ_FLOW.weakenTurns;
+      // 피해는 없지만, 이번 인카운터의 기억이 한 단계 열린다.
+      next.memoryTier = Math.min(3, next.memoryTier + 1);
+      pushLog(
+        next,
+        `흐름 읽기 — 박자가 눈에 들어온다. ${READ_FLOW.weakenTurns}턴 동안 상대의 힘이 빠진다.`
+      );
+      break;
+    }
+    case "vein-open": {
+      next.player.consecutiveGuards = 0;
+      const dealt = dealToEnemy(next, roll(rng, VEIN_OPEN.damage));
+      applyStain(next, VEIN_OPEN.stainCost, overflow);
+      next.enemy.bleedTurns = VEIN_OPEN.bleedTurns;
+      next.enemy.bleedPerTurn = VEIN_OPEN.bleedPerTurn;
+      pushLog(next, `혈맥 개방 — ${dealt}의 피해. 상처가 닫히지 않는다.`);
+      break;
+    }
     case "use-item": {
       next.player.consecutiveGuards = 0;
       if (action.itemId) {
@@ -471,7 +579,8 @@ export function takeTurn(
     next.enemy.hp = Math.min(next.enemy.def.maxHp, next.enemy.hp + healed);
     pushLog(next, `${enemyAction.label} — ${healed}만큼 상처를 여몄다.`);
   } else {
-    const raw = roll(rng, enemyAction.damage);
+    let raw = roll(rng, enemyAction.damage);
+    if (next.enemy.weakenTurns > 0) raw = Math.round(raw * READ_FLOW.weakenMultiplier);
     const taken = dealToPlayer(next, raw, enemyAction.kind);
     const guardNote = wasGuarding && next.player.guarding ? "" : "";
     pushLog(next, `${enemyAction.label} — ${taken}의 피해를 입었다.${guardNote}`);
@@ -489,6 +598,35 @@ export function takeTurn(
     if (!next.enemy.reverseDue) next.enemy.patternIndex += 1;
   } else {
     next.enemy.patternIndex += 1;
+  }
+
+  // --- 2.5. 적 상태이상 경과 ---
+  if (next.enemy.weakenTurns > 0) next.enemy.weakenTurns -= 1;
+  if (next.enemy.bleedTurns > 0) {
+    next.enemy.bleedTurns -= 1;
+    const bled = dealToEnemy(next, next.enemy.bleedPerTurn);
+    pushLog(next, `벌어진 상처에서 ${bled}의 피해가 이어진다.`);
+    if (next.enemy.bleedTurns === 0) next.enemy.bleedPerTurn = 0;
+    if (next.enemy.hp <= 0) {
+      next.over = true;
+      next.result = "win";
+      next.turn += 1;
+      next.record.turns = next.turn;
+      pushLog(next, `${next.enemy.def.name}이(가) 무너졌다.`);
+      return next;
+    }
+  }
+
+  // --- 2.7. 동료 지원 ---
+  // 무작위가 아니라 턴 수로 정해진다. 같은 전투는 같게 흘러야 회귀의 학습이 남는다.
+  applyAllySupport(next);
+  if (next.enemy.hp <= 0) {
+    next.over = true;
+    next.result = "win";
+    next.turn += 1;
+    next.record.turns = next.turn;
+    pushLog(next, `${next.enemy.def.name}이(가) 무너졌다.`);
+    return next;
   }
 
   // --- 3. 턴 마무리 ---

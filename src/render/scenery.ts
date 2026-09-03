@@ -20,7 +20,9 @@ export type SceneryStyle =
   | "endless-stairs"
   | "glassvein-underway"
   | "anchorage"
-  | "boundary-gate";
+  | "boundary-gate"
+  | "residue-district"
+  | "aftershock-road";
 
 interface SceneryPalette {
   skyTop: number;
@@ -36,6 +38,32 @@ interface SceneryPalette {
 }
 
 const PALETTES: Record<SceneryStyle, SceneryPalette> = {
+  // 잔재구 — 무너진 구역. 재와 먼지가 가라앉지 않는다.
+  "residue-district": {
+    skyTop: 0x0d0b0a,
+    skyBottom: 0x2a2320,
+    fog: 0x574a42,
+    structure: 0x1c1815,
+    accent: 0xc0a488,
+    groundNear: 0x0d0b0a,
+    groundFar: 0x302924,
+    particle: 0xd8c4b0,
+    rayColor: 0xc8ac90,
+    rayAlpha: 0.05,
+  },
+  // 여진로 — 아직 흔들리는 길. 금이 간 자리마다 옅게 빛난다.
+  "aftershock-road": {
+    skyTop: 0x0a0810,
+    skyBottom: 0x201a30,
+    fog: 0x453a5c,
+    structure: 0x181425,
+    accent: 0xa98cf0,
+    groundNear: 0x0a0810,
+    groundFar: 0x2a2340,
+    particle: 0xc9b0ff,
+    rayColor: 0xb49cf0,
+    rayAlpha: 0.055,
+  },
   // 정박지 — 물이 빠지지 않는 항구. 청록보다 탁하고 무겁게.
   anchorage: {
     skyTop: 0x060d12,

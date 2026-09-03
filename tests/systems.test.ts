@@ -9,6 +9,7 @@
 import {
   createInitialRegressionState,
   applyDeath,
+  grantAchievement,
   penaltyPurgeCost,
   purgeAllCost,
   purgeOnePenalty,
@@ -91,6 +92,12 @@ import { borrowedFaceDialogue } from "../src/data/dialogues/borrowed-face";
 import { countingMouthDialogue } from "../src/data/dialogues/counting-mouth";
 import { silentPilgrimDialogue } from "../src/data/dialogues/silent-pilgrim";
 import { ashBearerDialogue } from "../src/data/dialogues/ash-bearer";
+import { saltWardenDialogue } from "../src/data/dialogues/salt-warden";
+import { quitCounterDialogue } from "../src/data/dialogues/quit-counter";
+import { returnedNameDialogue } from "../src/data/dialogues/returned-name";
+import { ALLY_SUPPORTS, allyDefsFor } from "../src/data/combat/allies";
+import { LEARNED_SKILLS, unlockedSkills, isSkillUnlocked } from "../src/systems/SkillSystem";
+import { alliesOf } from "../src/systems/AffinitySystem";
 import { evaluateFreeText } from "../src/systems/DialogueSystem";
 import type { DialogueNode, DialogueTree } from "../src/systems/DialogueSystem";
 import { hazardClearance, canClearHazard, maxJumpRise, MIN_CLEARANCE_RATIO } from "../src/systems/Platforming";
@@ -595,6 +602,9 @@ const ALL_TREES: [string, DialogueTree][] = [
   ["counting-mouth", countingMouthDialogue],
   ["silent-pilgrim", silentPilgrimDialogue],
   ["ash-bearer", ashBearerDialogue],
+  ["salt-warden", saltWardenDialogue],
+  ["quit-counter", quitCounterDialogue],
+  ["returned-name", returnedNameDialogue],
 ];
 
 /** 한 노드에서 이어지는 모든 목적지 id. */
@@ -920,6 +930,105 @@ check("모든 적에 기억 힌트가 3단계 있다", enemies.every((e) => e.me
 check("적 id가 전부 고유하다", new Set(enemies.map((e) => e.id)).size === enemies.length);
 check("피해 범위가 뒤집힌 행동이 없다", enemies.every((e) => e.pattern.every((a) => a.damage[0] <= a.damage[1])));
 check("모든 행동에 예비동작 묘사가 있다", enemies.every((e) => e.pattern.every((a) => a.telegraph.length > 0)));
+
+// ---------------------------------------------------------------------------
+section("23. 되돌아온 이름 — 네 번째 죽는 방식(거짓말)");
+
+const rn = returnedNameDialogue.nodes;
+const statesChoices = rn["states"].choices ?? [];
+check("인정하는 선택지는 안전하다", statesChoices.some((c) => c.next === "admits" && !c.lethal));
+check("거짓말하는 선택지가 치명적이다", statesChoices.filter((c) => c.lethal).length >= 2);
+check("침묵은 즉사가 아니라 한 번 더 기회를 준다", statesChoices.some((c) => c.next === "silence" && !c.lethal));
+
+// 앞의 상대들과 죽는 이유가 달라야 한다.
+const rnLethals = new Set(lethalsIn(returnedNameDialogue));
+const bfLethals = new Set(lethalsIn(borrowedFaceDialogue));
+check("빌린 얼굴과 사망 사유가 겹치지 않는다", [...rnLethals].every((l) => !bfLethals.has(l)));
+check("이름을 주는 쪽과 숨기는 쪽이 정반대다", rnLethals.size >= 2);
+
+// 자유 입력: 모른다고 하면 살고, 단정하면 죽는다.
+const countNode = rn["asks-count"];
+const humble = evaluateFreeText("몇 번인지 모르겠습니다", countNode);
+check("모른다고 인정하면 산다", !humble.lethal && humble.next === "accepts-unknown", humble.next);
+const boast = evaluateFreeText("한 번뿐입니다", countNode);
+check("틀린 수를 단정하면 죽는다", !!boast.lethal);
+check("애매한 답도 죽지는 않는다", !evaluateFreeText("글쎄요 그게", countNode).lethal);
+
+// ---------------------------------------------------------------------------
+section("24. 새 연공과 상태이상");
+
+const skillEnemy = { ...GLASS_MITE, maxHp: 200 };
+
+// 연격 — 두 번 나눠 들어간다.
+const chain = takeTurn(createCombat({ enemy: skillEnemy, memoryTier: 3 }), { id: "chain-strike" }, createRng("c"));
+check("연격이 피해를 준다", chain.enemy.hp < skillEnemy.maxHp);
+check("연격이 얼룩을 조금 올린다", chain.player.stain > 0);
+
+// 흐름 읽기 — 피해는 없지만 약화와 기억을 준다.
+const readBase = createCombat({ enemy: skillEnemy, memoryTier: 1, playerMaxHp: 300, playerHp: 300 });
+const read = takeTurn(readBase, { id: "read-flow" }, createRng("r"));
+check("흐름 읽기는 기억을 한 단계 연다", read.memoryTier === 2, `${read.memoryTier}`);
+check("흐름 읽기가 적을 약화시킨다", read.enemy.weakenTurns > 0);
+
+// 약화가 실제로 피해를 줄이는지 — 같은 시드로 비교한다.
+const plainHit = takeTurn(createCombat({ enemy: SUTURED_PILGRIM, memoryTier: 3, playerMaxHp: 300, playerHp: 300 }), { id: "basic-strike" }, createRng("dmg"));
+const weakBase = createCombat({ enemy: SUTURED_PILGRIM, memoryTier: 3, playerMaxHp: 300, playerHp: 300 });
+weakBase.enemy.weakenTurns = 3;
+const weakHit = takeTurn(weakBase, { id: "basic-strike" }, createRng("dmg"));
+check("약화 중에는 덜 맞는다", weakHit.record.damageTaken <= plainHit.record.damageTaken, `${plainHit.record.damageTaken} vs ${weakHit.record.damageTaken}`);
+
+// 혈맥 개방 — 출혈이 턴마다 이어진다.
+const veinBase = createCombat({ enemy: skillEnemy, memoryTier: 3, playerMaxHp: 300, playerHp: 300 });
+const vein = takeTurn(veinBase, { id: "vein-open" }, createRng("v"));
+check("혈맥 개방이 출혈을 남긴다", vein.enemy.bleedTurns > 0);
+check("혈맥 개방은 얼룩을 크게 올린다", vein.player.stain >= 15, `${vein.player.stain}`);
+const afterBleed = takeTurn(vein, { id: "guard" }, createRng("v2"));
+check("출혈이 다음 턴에도 깎는다", afterBleed.enemy.hp < vein.enemy.hp);
+check("출혈은 턴이 지나면 줄어든다", afterBleed.enemy.bleedTurns < vein.enemy.bleedTurns);
+
+// 연공 잠금 — 처음부터 다 주지 않는다.
+let skillState = fresh();
+check("처음에는 아무 연공도 못 쓴다", unlockedSkills(skillState).length === 0);
+check("연격은 잠겨 있다", !isSkillUnlocked(skillState, "chain-strike"));
+skillState = grantAchievement(skillState, "reach-a-branch", 10);
+check("분기점을 갱신하면 연격이 열린다", isSkillUnlocked(skillState, "chain-strike"));
+check("아직 흐름 읽기는 잠겨 있다", !isSkillUnlocked(skillState, "read-flow"));
+skillState = { ...skillState, runCount: 3 };
+check("세 번 회귀하면 흐름 읽기가 열린다", isSkillUnlocked(skillState, "read-flow"));
+check("모든 연공에 조건 설명이 있다", LEARNED_SKILLS.every((sk) => sk.requirement.length > 0));
+
+// ---------------------------------------------------------------------------
+section("25. 동료 지원");
+
+check("동료 정의가 여럿이다", Object.keys(ALLY_SUPPORTS).length >= 5);
+check("동료마다 하는 일이 다르다", new Set(Object.values(ALLY_SUPPORTS).map((a) => a.kind)).size >= 5);
+check("모르는 id는 조용히 무시된다", allyDefsFor(["없는사람", "isra"]).length === 1);
+
+// 동료로 굳은 인물만 전투에 들어온다.
+const allyState = adjustAffinity(fresh(), "isra", 80).state;
+check("동료 목록에 잡힌다", alliesOf(allyState).includes("isra"));
+check("동료가 아니면 목록에 없다", !alliesOf(fresh()).includes("isra"));
+
+// 지원이 실제로 전투에 반영되는지 — 회복 동료로 확인한다.
+const hurt = { enemy: GLASS_MITE, memoryTier: 3, playerMaxHp: 200, playerHp: 60 };
+let solo = createCombat(hurt);
+let withIsra = createCombat({ ...hurt, allies: ["isra"] });
+check("동료가 전투 상태에 들어온다", withIsra.allies.length === 1 && solo.allies.length === 0);
+for (let i = 0; i < 3; i++) {
+  solo = takeTurn(solo, { id: "guard" }, createRng(`s${i}`));
+  withIsra = takeTurn(withIsra, { id: "guard" }, createRng(`s${i}`));
+}
+check("동료가 있으면 체력이 더 남는다", withIsra.player.hp > solo.player.hp, `${solo.player.hp} vs ${withIsra.player.hp}`);
+check("동료 지원이 로그에 남는다", withIsra.log.some((l) => l.includes("이스라")));
+
+// 같은 시드·같은 행동이면 같은 결과여야 회귀의 학습이 남는다.
+let allyRunA = createCombat({ ...hurt, allies: ["isra"] });
+let allyRunB = createCombat({ ...hurt, allies: ["isra"] });
+for (let i = 0; i < 3; i++) {
+  allyRunA = takeTurn(allyRunA, { id: "guard" }, createRng(`s${i}`));
+  allyRunB = takeTurn(allyRunB, { id: "guard" }, createRng(`s${i}`));
+}
+check("동료 지원은 무작위가 아니다", allyRunA.player.hp === allyRunB.player.hp);
 
 // ---------------------------------------------------------------------------
 console.log(`\n${passed}개 통과, ${failed}개 실패`);
