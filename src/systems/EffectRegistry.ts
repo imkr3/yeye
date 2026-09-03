@@ -2,6 +2,7 @@ import type { CombatState } from "./CombatSystem";
 import { addStain } from "./StainSystem";
 import {
   addCoins,
+  addDust,
   addStoryFlag,
   addWardCharge,
   removeConsumable,
@@ -273,6 +274,55 @@ const RELIC_EFFECTS: Record<string, { note: string; apply: RelicModifier }> = {
   "ledger-of-small-mercies": {
     note: "회복 +20%, 균열 회복 +10, 여진 가루 1.5배",
     apply: (m) => { m.healingMultiplier *= 1.2; m.riftHealBonus += 10; m.dustMultiplier *= 1.5; },
+  },
+  // --- 3차 배치 ---
+  "cracked-lens": {
+    note: "죽음의 기억 최소 1단계",
+    apply: (m) => { m.memoryFloor = Math.max(m.memoryFloor, 1); },
+  },
+  "leather-cord": {
+    note: "기초 타격 +2",
+    apply: (m) => { m.basicStrikeBonus += 2; },
+  },
+  "flat-stone": {
+    note: "함정 피해 10% 감소",
+    apply: (m) => { m.trapDamageMultiplier *= 0.9; },
+  },
+  "salt-crusted-boots": {
+    note: "이동 속도 +15%",
+    apply: (m) => { m.moveSpeedMultiplier *= 1.15; },
+  },
+  "tin-charm": {
+    note: "전투 시작 보호막 +8",
+    apply: (m) => { m.startingShield += 8; },
+  },
+  "ledger-clip": {
+    note: "여진화 보상 +20%",
+    apply: (m) => { m.coinMultiplier *= 1.2; },
+  },
+  "pilgrims-thread": {
+    note: "얼룩 상승 15% 감소, 방어 성공 시 4 피해 반격",
+    apply: (m) => { m.stainMultiplier *= 0.85; m.guardCounter += 4; },
+  },
+  "counters-abacus": {
+    note: "여진 가루 1.6배, 환로 10% 할인",
+    apply: (m) => { m.dustMultiplier *= 1.6; m.shopDiscount += 0.1; },
+  },
+  "hollow-name-tag": {
+    note: "신뢰 획득 1.5배",
+    apply: (m) => { m.trustMultiplier *= 1.5; },
+  },
+  "stitched-lips-charm": {
+    note: "죽음의 기억 최소 2단계",
+    apply: (m) => { m.memoryFloor = Math.max(m.memoryFloor, 2); },
+  },
+  "anchorage-stone": {
+    note: "회복 +15%, 균열 회복 +9",
+    apply: (m) => { m.healingMultiplier *= 1.15; m.riftHealBonus += 9; },
+  },
+  "the-unasked-question": {
+    note: "신뢰 1.3배, 트루엔딩 판정 +1",
+    apply: (m) => { m.trustMultiplier *= 1.3; m.endingTrustBonus += 1; },
   },
 };
 
@@ -552,7 +602,102 @@ const CONSUMABLE_EFFECTS: Record<string, ConsumableDefinition> = {
       return "모른의 백지 — 이 장에는 아무것도 적히지 않는다. 얼룩도, 범람도.";
     },
   },
+  // --- 3차 배치 ---
+  "ash-scrapings": {
+    note: "여진 가루 3 획득",
+    field: (state) => addDust(state, 3),
+    report: () => "재 부스러기 — 쓸어 담아 여진 가루 3을 얻었다.",
+  },
+  "river-salt-packet": {
+    note: "얼룩 14 감소",
+    combat: (state) => {
+      state.player.stain = addStain(state.player.stain, -14);
+      return "강소금 한 봉 — 번진 자리가 따갑게 씻긴다.";
+    },
+  },
+  "tallow-nub": {
+    note: "기억 +1, 보호막 5",
+    combat: (state) => {
+      state.memoryTier = Math.min(3, state.memoryTier + 1);
+      state.player.shield += 5;
+      return "양초 토막 — 짧게 타오르는 동안 상대의 손이 보인다.";
+    },
+  },
+  "bent-nail": {
+    note: "적에게 9 고정 피해",
+    combat: (state) => {
+      const dealt = 9;
+      state.enemy.hp = Math.max(0, state.enemy.hp - dealt);
+      state.record.damageDealt += dealt;
+      return `휜 못 — 던져 박았다. ${dealt}의 피해.`;
+    },
+  },
+  "listeners-wax": {
+    note: "지닌 것만으로 대화의 위험한 갈래가 보인다",
+    // 소모하지 않는다 — 가지고 있는 동안 계속 효과가 있다.
+  },
+  "spare-breath": {
+    note: "체력 18 회복, 보호막 8",
+    combat: (state, mods) => {
+      const healed = Math.round(18 * mods.healingMultiplier);
+      state.player.hp = Math.min(state.player.maxHp, state.player.hp + healed);
+      state.player.shield += 8;
+      return `여분의 숨 — 체력 ${healed} 회복. 숨이 트인다.`;
+    },
+  },
+  "mudlarks-hook": {
+    note: "균열에서 앞의 방 3개를 드러낸다",
+    rift: () => ({ revealRooms: 3, message: "갯벌 갈고리 — 앞쪽 세 칸이 바닥째 끌려 나온다." }),
+  },
+  "unsent-letter": {
+    note: "파편 40 획득",
+    field: (state) => ({ ...state, fragments: state.fragments + 40 }),
+    report: () => "부치지 못한 편지 — 끝내 부치지 못한 만큼이 파편 40으로 남았다.",
+  },
+  "second-hand-name": {
+    note: "표식 해제, 보호막 22",
+    combat: (state) => {
+      state.enemy.markedPlayer = false;
+      state.player.shield += 22;
+      return "얻어 쓴 이름 — 표식이 남의 이름 위로 미끄러진다.";
+    },
+  },
+  "stitchers-needle": {
+    note: "범람 종료, 체력 24 회복",
+    combat: (state, mods) => {
+      const healed = Math.round(24 * mods.healingMultiplier);
+      state.player.hp = Math.min(state.player.maxHp, state.player.hp + healed);
+      state.player.overflowTurnsLeft = 0;
+      return `꿰매는 바늘 — 벌어진 자리를 닫는다. 체력 ${healed} 회복.`;
+    },
+  },
+  "counted-breath": {
+    note: "반격당하지 않는 행동 3회",
+    combat: (state) => {
+      state.player.freeActions += 3;
+      return "세어 둔 숨 — 하나, 둘, 셋. 그만큼 먼저 움직인다.";
+    },
+  },
+  "unspoken-answer": {
+    note: "얼룩 제거, 기억 3단계, 무료 행동 2회",
+    combat: (state) => {
+      state.player.stain = 0;
+      state.memoryTier = 3;
+      state.player.freeActions += 2;
+      return "하지 않은 대답 — 말하지 않았기에 아직 아무것도 정해지지 않았다.";
+    },
+  },
 };
+
+/**
+ * 지니고만 있어도 대화의 치명적인 갈래를 드러내는 아이템들.
+ * 소모되지 않으므로 "사용"이 아니라 소지 여부로 판정한다.
+ */
+export const DANGER_REVEALING_ITEMS = ["truth-buoy", "listeners-wax"] as const;
+
+export function revealsDialogueDanger(carried: readonly string[]): boolean {
+  return DANGER_REVEALING_ITEMS.some((id) => carried.includes(id));
+}
 
 export function consumableHasCombatUse(itemId: string): boolean {
   return !!CONSUMABLE_EFFECTS[itemId]?.combat;

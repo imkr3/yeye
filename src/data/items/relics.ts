@@ -57,4 +57,27 @@ export const RELIC_POOL: RelicItem[] = [
 
   // --- SSR ---
   { id: "ledger-of-small-mercies", name: "작은 자비의 장부", rarity: "SSR", flavor: "큰 선행은 한 줄도 없다. 사소한 것만 빼곡하다.", trait: "회복량과 균열 회복, 여진 가루 환원이 모두 늘어난다." },
+
+  // === 3차 배치 =============================================================
+  // --- C ---
+  { id: "cracked-lens", name: "금 간 렌즈", rarity: "C", flavor: "금 너머로 보면 두 번 보인다.", trait: "첫 조우에도 죽음의 기억이 조금 남아 있다." },
+  { id: "leather-cord", name: "가죽 끈", rarity: "C", flavor: "손잡이에 감으면 미끄러지지 않는다.", trait: "기초 타격 피해가 증가한다." },
+  { id: "flat-stone", name: "납작한 돌", rarity: "C", flavor: "밟고 건너기 좋게 생겼다.", trait: "함정 피해를 조금 덜 받는다." },
+
+  // --- UC ---
+  { id: "salt-crusted-boots", name: "소금 앉은 장화", rarity: "UC", flavor: "밑창에 소금이 굳어 딱딱하다.", trait: "이동이 빨라진다." },
+  { id: "tin-charm", name: "양철 부적", rarity: "UC", flavor: "값은 싸지만 없는 것보다는 낫다.", trait: "전투를 보호막을 두른 채 시작한다." },
+  { id: "ledger-clip", name: "장부 집게", rarity: "UC", flavor: "리브가 쓰던 것과 같은 모양이다.", trait: "여진화 보상이 증가한다." },
+
+  // --- R ---
+  { id: "pilgrims-thread", name: "순례자의 실", rarity: "R", flavor: "끊어진 자리에서 주웠다. 아직 따뜻했다.", trait: "얼룩이 느리게 번지고, 방어에 성공하면 되받아친다." },
+  { id: "counters-abacus", name: "셈꾼의 주판", rarity: "R", flavor: "알이 하나 모자란다. 세 번째 자리가 비어 있다.", trait: "여진 가루 환원이 늘고 환로 값이 싸진다." },
+  { id: "hollow-name-tag", name: "빈 이름표", rarity: "R", flavor: "이름 칸을 굳이 채우지 않는 사람도 있다.", trait: "신뢰를 더 크게 얻는다." },
+
+  // --- SR ---
+  { id: "stitched-lips-charm", name: "꿰맨 입술 부적", rarity: "SR", flavor: "말하지 않는 법을 배운 자의 것.", trait: "죽음의 기억이 처음부터 또렷하다." },
+  { id: "anchorage-stone", name: "정박지의 돌", rarity: "SR", flavor: "물이 흐르는 곳에서만 주울 수 있다.", trait: "회복량이 늘고 균열 안에서 더 회복한다." },
+
+  // --- SSR ---
+  { id: "the-unasked-question", name: "묻지 않은 질문", rarity: "SSR", flavor: "묻지 않았기 때문에 아직 답이 남아 있다.", trait: "신뢰가 크게 늘고 숨겨진 결말 판정에 가산된다." },
 ];

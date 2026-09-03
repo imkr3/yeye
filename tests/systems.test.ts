@@ -52,6 +52,8 @@ import {
   COMPASS_FLAG,
   MARKET_TIPOFF_FLAG,
   relicHasEffect,
+  revealsDialogueDanger,
+  DANGER_REVEALING_ITEMS,
 } from "../src/systems/EffectRegistry";
 import { resolveEnding } from "../src/systems/EndingSystem";
 import { pullOnce, pullFive, PITY_THRESHOLD, DUPLICATE_DUST, rarityOdds, priceFor, consumeMarketTipoff, PRICES } from "../src/systems/EconomySystem";
@@ -747,6 +749,41 @@ check("페널티가 없을 때 정화해도 문제없다", purgeAllPenalties(fre
 
 // 정화 후에도 저장 정규화를 통과해야 한다.
 check("정화한 상태가 저장 규격을 지킨다", normalizeState(purgedAll).accumulatedPenalties.length === 0);
+
+// ---------------------------------------------------------------------------
+section("19. 3차 배치와 대화 위험 표식");
+
+check("소모품 풀이 44종이다", CONSUMABLE_POOL.length === 44, `${CONSUMABLE_POOL.length}`);
+check("유물 풀이 44종이다", RELIC_POOL.length === 44, `${RELIC_POOL.length}`);
+
+// 지니고만 있어도 되는 아이템 — 소모되지 않는다.
+check("부표를 지니면 위험이 드러난다", revealsDialogueDanger(["truth-buoy"]));
+check("듣는 밀랍을 지녀도 드러난다", revealsDialogueDanger(["listeners-wax"]));
+check("둘 다 없으면 드러나지 않는다", !revealsDialogueDanger(["dried-jerky", "bent-nail"]));
+check("빈 소지품에서도 안전하게 동작한다", !revealsDialogueDanger([]));
+check(
+  "표식 아이템이 전부 실제 소모품 풀에 있다",
+  DANGER_REVEALING_ITEMS.every((id) => CONSUMABLE_POOL.some((c) => c.id === id))
+);
+
+// 기억 최소 단계는 합산이 아니라 최댓값이어야 한다 — 합치면 3단계를 넘어버린다.
+const floors = relicModifiers(["cracked-lens", "stitched-lips-charm"]);
+check("기억 최소 단계는 가장 높은 것만 적용된다", floors.memoryFloor === 2, `${floors.memoryFloor}`);
+check("기억 최소 단계가 3을 넘지 않는다", floors.memoryFloor <= 3);
+
+// 3차 배치 유물이 실제로 수정치를 바꾸는지 몇 개 확인한다.
+check("장부 집게가 여진화 보상을 올린다", relicModifiers(["ledger-clip"]).coinMultiplier > 1);
+check("납작한 돌이 함정 피해를 줄인다", relicModifiers(["flat-stone"]).trapDamageMultiplier < 1);
+check("양철 부적이 시작 보호막을 준다", relicModifiers(["tin-charm"]).startingShield === 8);
+const abacus = relicModifiers(["counters-abacus"]);
+check("셈꾼의 주판이 가루와 할인을 동시에 준다", abacus.dustMultiplier > 1 && abacus.shopDiscount > 0);
+check("묻지 않은 질문이 트루엔딩 판정을 밀어준다", relicModifiers(["the-unasked-question"]).endingTrustBonus === 1);
+
+// 할인이 겹쳐도 값이 0이 되지 않아야 한다.
+let discountState = fresh();
+discountState = { ...discountState, equippedRelics: ["counters-abacus"], storyFlags: [MARKET_TIPOFF_FLAG] };
+check("할인을 모두 겹쳐도 값은 1 이상이다", priceFor(1, discountState) >= 1);
+check("할인이 겹치면 실제로 싸진다", priceFor(PRICES.singlePull, discountState) < PRICES.singlePull);
 
 // ---------------------------------------------------------------------------
 console.log(`\n${passed}개 통과, ${failed}개 실패`);
