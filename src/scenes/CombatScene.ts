@@ -42,7 +42,10 @@ export interface CombatSceneData {
   onResult: (outcome: CombatOutcome) => void;
 }
 
-type MenuMode = "root" | "mark" | "item" | "over";
+import { LEARNED_SKILLS, unlockedSkills } from "../systems/SkillSystem";
+import { alliesOf } from "../systems/AffinitySystem";
+
+type MenuMode = "root" | "mark" | "item" | "skill" | "over";
 
 const ACCENT = 0xd1616c;
 const PANEL = 0x0d0b12;
@@ -51,6 +54,7 @@ export class CombatScene extends Phaser.Scene {
   private combatData!: CombatSceneData;
   private combat!: CombatState;
   private mode: MenuMode = "root";
+  private allyNodes: Phaser.GameObjects.GameObject[] = [];
   private rng = createRng("combat");
 
   private enemyFigure!: Phaser.GameObjects.Container;
@@ -80,6 +84,8 @@ export class CombatScene extends Phaser.Scene {
       playerMaxHp: data.playerMaxHp,
       stain: data.stain,
       modifiers: relicModifiers(getState().equippedRelics),
+      // 동료로 굳은 인물은 전투에 실제로 끼어든다 — 호감도가 결말에서만 값을 하지 않도록.
+      allies: alliesOf(getState()),
     });
   }
 
@@ -316,11 +322,45 @@ export class CombatScene extends Phaser.Scene {
     });
 
     this.renderTimeline();
+    this.renderAllies();
     this.memoryText.setText(`죽음의 기억 ${c.memoryTier}/3`);
     this.intentText.setText(c.over ? "" : describeEnemyIntent(c));
     this.logText.setText(c.log.slice(-8).join("\n"));
 
     this.renderMenu();
+  }
+
+  /**
+   * 함께 싸우는 동료와, 각자 다음 지원까지 남은 턴을 보여준다.
+   * 지원이 언제 오는지 셀 수 있어야 동료가 전술의 일부가 된다.
+   */
+  private renderAllies() {
+    this.allyNodes.forEach((n) => n.destroy());
+    this.allyNodes = [];
+    const allies = this.combat.allies;
+    if (allies.length === 0) return;
+
+    const header = this.add
+      .text(24, 452, "함께 있는 사람", {
+        fontFamily: "monospace",
+        fontSize: "10px",
+        color: "#6b6255",
+      })
+      .setDepth(8);
+    this.allyNodes.push(header);
+
+    allies.forEach((a, i) => {
+      const until = a.everyTurns - (this.combat.turn % a.everyTurns);
+      const ready = until === a.everyTurns;
+      const node = this.add
+        .text(24, 468 + i * 15, `${a.name}  ${ready ? "· 지금" : `· ${until}턴 뒤`}`, {
+          fontFamily: "monospace",
+          fontSize: "11px",
+          color: ready ? "#8fbfa4" : "#7a7189",
+        })
+        .setDepth(8);
+      this.allyNodes.push(node);
+    });
   }
 
   /**
@@ -526,12 +566,33 @@ export class CombatScene extends Phaser.Scene {
       return;
     }
 
+    if (this.mode === "skill") {
+      const state = getState();
+      const options = LEARNED_SKILLS.map((sk) => {
+        const open = sk.unlocked(state);
+        return {
+          label: open ? sk.name : `${sk.name} [잠김]`,
+          act: () => (open ? this.act({ id: sk.id }) : undefined),
+          disabled: !open,
+          note: open ? sk.description : sk.requirement,
+        };
+      });
+      options.push({ label: "돌아가기", act: () => this.setMode("root"), disabled: false, note: "" });
+      this.renderChoices("연공", options);
+      return;
+    }
+
     const lastDitchReady = canUseLastDitch(this.combat);
+    const learned = unlockedSkills(getState()).length;
     this.renderChoices("행동을 고르세요", [
       { label: "기초 타격", act: () => this.act({ id: "basic-strike" }) },
       { label: "방어", act: () => this.act({ id: "guard" }) },
       { label: "인과 표식", act: () => this.setMode("mark") },
       { label: "결손 절단", act: () => this.act({ id: "sunder" }) },
+      {
+        label: `연공 (${learned}/${LEARNED_SKILLS.length})`,
+        act: () => this.setMode("skill"),
+      },
       {
         label: "막바지 승부",
         act: () => this.act({ id: "last-ditch" }),

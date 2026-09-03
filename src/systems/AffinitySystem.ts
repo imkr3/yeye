@@ -143,6 +143,13 @@ export function adjustAffinity(
   };
 }
 
+/** 동료로 굳은 NPC id 목록 — 전투 지원에 쓰인다. */
+export function alliesOf(state: RegressionState): string[] {
+  return state.storyFlags
+    .filter((f) => f.startsWith("ally:"))
+    .map((f) => f.slice("ally:".length));
+}
+
 /** 동료가 된 NPC 수 — 엔딩과 일부 판정에 쓰인다. */
 export function allyCount(state: RegressionState): number {
   return state.storyFlags.filter((f) => f.startsWith("ally:")).length;

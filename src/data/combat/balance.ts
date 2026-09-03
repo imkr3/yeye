@@ -58,3 +58,25 @@ export const ENEMY_SCALING = {
   /** 죽음의 기억 단계가 오를수록 의도 표시가 정확해진다 */
   intentAccuracyByTier: [0, 0.45, 0.75, 1] as const,
 };
+
+/** 연격 — 한 방이 약한 대신 두 번 들어간다. 보호막·경감을 두 번 뚫는다. */
+export const CHAIN_STRIKE = {
+  hits: 2,
+  damage: [5, 9] as [number, number],
+  stainCost: 2,
+};
+
+/** 흐름 읽기 — 피해는 없지만 적을 약화시키고 의도를 드러낸다. */
+export const READ_FLOW = {
+  weakenTurns: 3,
+  /** 약화 중 적 피해에 곱해지는 값. */
+  weakenMultiplier: 0.7,
+};
+
+/** 혈맥 개방 — 큰 피해와 출혈, 대신 얼룩이 크게 번진다. */
+export const VEIN_OPEN = {
+  damage: [16, 24] as [number, number],
+  stainCost: 18,
+  bleedTurns: 3,
+  bleedPerTurn: 5,
+};

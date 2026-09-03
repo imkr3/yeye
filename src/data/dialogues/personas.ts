@@ -81,6 +81,32 @@ export const NPC_PERSONAS: Record<string, NpcPersona> = {
     wounds: [],
     inhuman: true,
   },
+  "salt-warden": {
+    id: "salt-warden",
+    name: "소금 관리인",
+    summary: "정박지의 소금 창고를 지킨다. 말보다 손을 본다.",
+    values: ["직접 돕겠다는 제안", "무겁다고 솔직히 말하는 것", "쓸모"],
+    dislikes: ["그냥 달라는 요구", "빈말", "창고에 기대는 것"],
+    wounds: ["소금이 하찮다는 말"],
+  },
+  "quit-counter": {
+    id: "quit-counter",
+    name: "셈을 그만둔 사람",
+    summary: "「셋을 세는 입」과 계약할 뻔했다가 되물어서 빠져나온 사람.",
+    values: ["겪은 것을 나누는 태도", "규칙을 궁금해하는 것"],
+    dislikes: ["그깟 일로 겁먹었냐는 투", "재촉"],
+    wounds: ["세 번째까지 갔던 일을 우습게 말하는 것"],
+  },
+  "returned-name": {
+    id: "returned-name",
+    name: "되돌아온 이름",
+    summary:
+      "경계문 앞에 선 것. 묻지 않고 단정한다 — 이미 답을 알고 확인만 한다. 거짓을 통과시키지 않는다.",
+    values: ["인정", "모른다고 말하는 것", "참"],
+    dislikes: ["둘러대는 말", "모른 척", "확신 없는 단정"],
+    wounds: [],
+    inhuman: true,
+  },
   "ash-bearer": {
     id: "ash-bearer",
     name: "재를 지고 가는 사람",
