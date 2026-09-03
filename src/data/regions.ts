@@ -49,10 +49,13 @@ export interface RegionConfig {
   npcs: RegionNpcConfig[];
   /** 분기점 도달 후 열리는 다음 지역. 없으면 이 지역이 이야기의 종착점. */
   nextRegionKey?: string;
-  /** 분기점과 무관하게 항상 오갈 수 있는 곁가지 통로 (파밍 루프 연결용). */
-  sideExit?: { x: number; y: number; toRegionKey: string; label: string };
+  /**
+   * 분기점과 무관하게 항상 오갈 수 있는 곁가지 통로 (파밍 루프 연결용).
+   * 허브에서 여러 갈래로 뻗을 수 있도록 배열로 둔다.
+   */
+  sideExits?: { x: number; y: number; toRegionKey: string; label: string }[];
   /** 균열 진입구 — 닿으면 RiftScene으로 들어간다. */
-  riftEntrance?: { x: number; y: number; label: string };
+  riftEntrance?: { x: number; y: number; label: string; riftId?: string };
   /** 환로 — 여진화로 뽑기와 교환을 하는 자리. */
   exchangePost?: { x: number; y: number; label: string };
 }
@@ -110,8 +113,11 @@ export const REGIONS: Record<string, RegionConfig> = {
       },
     ],
     nextRegionKey: "frost-observatory",
-    sideExit: { x: 480, y: 550, toRegionKey: "endless-stairs", label: "곁길: 끝없는 계단" },
-    riftEntrance: { x: 800, y: 470, label: "균열: 유리맥의 지하도" },
+    sideExits: [
+      { x: 300, y: 550, toRegionKey: "endless-stairs", label: "곁길: 끝없는 계단" },
+      { x: 700, y: 550, toRegionKey: "anchorage", label: "곁길: 정박지" },
+    ],
+    riftEntrance: { x: 800, y: 470, label: "균열: 유리맥의 지하도", riftId: "glassvein-underway" },
     exchangePost: { x: 560, y: 180, label: "환로" },
   },
 
@@ -154,7 +160,7 @@ export const REGIONS: Record<string, RegionConfig> = {
         dialogue: ashBearerDialogue,
       },
     ],
-    sideExit: { x: 480, y: 560, toRegionKey: "ash-market", label: "재의 시장으로 돌아가기" },
+    sideExits: [{ x: 480, y: 560, toRegionKey: "ash-market", label: "재의 시장으로 돌아가기" }],
   },
 
   // 정면 승부 불가 구간을 뚫고 헬가에게 도달하는 선형 구간 — 횡스크롤.
@@ -174,6 +180,57 @@ export const REGIONS: Record<string, RegionConfig> = {
     ],
     npcs: [{ id: "helga", label: "헬가 도른", x: 1750, y: 420, color: 0xa8873a, shape: "triangle", dialogue: helgaDialogue }],
     // nextRegionKey 없음 — 헬가와의 대화가 끝나면 엔딩으로 이어진다.
+  },
+
+  // --- 곁가지 지역 ---------------------------------------------------------
+
+  // 정박지 — 던전 허브. 물이 빠지지 않는 항구, 잠긴 정박지 균열로 내려가는 자리.
+  // NPC 대신 상호작용 지점을 촘촘히 둬서 "장비 갖추고 내려가는 곳" 역할을 맡긴다.
+  anchorage: {
+    key: "anchorage",
+    title: "정박지",
+    backgroundColor: 0x12242c,
+    movementMode: "topdown",
+    playerStart: { x: 80, y: 300 },
+    pickups: [
+      { id: "anchorage-pier-1", x: 300, y: 180, fragmentReward: 12 },
+      { id: "anchorage-pier-2", x: 820, y: 380, fragmentReward: 18 },
+    ],
+    npcs: [],
+    sideExits: [
+      { x: 120, y: 550, toRegionKey: "ash-market", label: "재의 시장으로 돌아가기" },
+      { x: 860, y: 550, toRegionKey: "boundary-gate", label: "곁길: 경계문 앞" },
+    ],
+    riftEntrance: {
+      x: 520,
+      y: 430,
+      label: "균열: 잠긴 정박지",
+      riftId: "sunken-anchorage",
+    },
+    exchangePost: { x: 780, y: 170, label: "환로 (부두)" },
+  },
+
+  // 경계문 앞 — 색이 거의 빠진 선형 구간. 지나가려면 붙어 있는 것을 떼어내야 한다.
+  "boundary-gate": {
+    key: "boundary-gate",
+    title: "경계문 앞",
+    backgroundColor: 0x1a181e,
+    movementMode: "sidescroll",
+    worldWidth: 2400,
+    groundY: 420,
+    playerStart: { x: 70, y: 380 },
+    // 크기는 Platforming.hazardClearance가 검증한다 — 여유 배율 1.4 미만이면 테스트가 실패한다.
+    hazard: { x: 1150, y: 420, w: 46, h: 88, label: "갈라진 포석 — 점프로 넘으세요" },
+    platforms: [
+      { x: 620, y: 330, w: 130, h: 16 },
+      { x: 1600, y: 320, w: 130, h: 16 },
+    ],
+    pickups: [
+      { id: "boundary-ledge-1", x: 620, y: 300, fragmentReward: 14 },
+      { id: "boundary-ledge-2", x: 1600, y: 290, fragmentReward: 20 },
+    ],
+    npcs: [],
+    sideExits: [{ x: 60, y: 420, toRegionKey: "anchorage", label: "정박지로 돌아가기" }],
   },
 };
 

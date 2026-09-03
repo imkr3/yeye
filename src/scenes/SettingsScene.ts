@@ -63,6 +63,15 @@ export class SettingsScene extends Phaser.Scene {
     this.render();
   }
 
+  private openJudgeSettings() {
+    this.scene.launch("JudgeSettingsScene");
+    this.scene.get("JudgeSettingsScene").events.once("shutdown", () => {
+      this.scene.wake();
+      this.render();
+    });
+    this.scene.sleep();
+  }
+
   private render() {
     this.nodes.forEach((n) => n.destroy());
     this.nodes = [];
@@ -141,8 +150,19 @@ export class SettingsScene extends Phaser.Scene {
     );
     this.nodes.push(keyGuide);
 
+    const judgeBtn = this.add
+      .text(60, 512, "[ 5 ] AI 대화 판정 설정 →", {
+        fontFamily: "serif",
+        fontSize: "15px",
+        color: "#c9b0ff",
+      })
+      .setInteractive({ useHandCursor: true });
+    judgeBtn.on("pointerdown", () => this.openJudgeSettings());
+    this.nodes.push(judgeBtn);
+    this.options.push({ label: "AI 대화 판정 설정", act: () => this.openJudgeSettings() });
+
     const close = this.add
-      .text(480, 546, "[ Esc ] 돌아가기", {
+      .text(480, 560, "[ Esc ] 돌아가기", {
         fontFamily: "monospace",
         fontSize: "13px",
         color: "#8fbfa4",

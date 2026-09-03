@@ -1,10 +1,11 @@
 import Phaser from "phaser";
 import {
   getNode,
-  evaluateFreeText,
   type DialogueNode,
   type DialogueTree,
 } from "../systems/DialogueSystem";
+import { createJudge, type DialogueJudge, type JudgeVerdict } from "../systems/dialogue";
+import { personaOf } from "../data/dialogues/personas";
 import { drawCrest } from "../render/silhouettes";
 import { getState } from "../state/gameState";
 
@@ -16,6 +17,13 @@ export interface DialogueSceneData {
   onLethal?: (reason: string) => void;
   /** 「거짓말 탐지 부표」를 지녔을 때만 참 — 치명적인 갈래에 표식을 붙인다. */
   revealDanger?: boolean;
+  /** 판정 시점의 호감도. */
+  affinity?: number;
+  /**
+   * 자유 입력 판정 결과로 호감도가 움직였을 때. 관계 단계가 바뀌었으면
+   * 화면에 남길 문구를 돌려준다.
+   */
+  onAffinity?: (npcId: string, delta: number) => string | null;
   onClose: () => void;
 }
 
@@ -37,6 +45,22 @@ const LINE_Y = PANEL.y + 52;
 const CONTENT_MIN_Y = PANEL.y + 118;
 const OPTION_STEP = 27;
 const TYPE_MS = 22;
+
+const TONE_MARK: Record<string, string> = {
+  warm: "관계 ↑",
+  neutral: "관계 ―",
+  cold: "관계 ↓",
+  hostile: "관계 ↓↓",
+  forbidden: "관계 ↓↓↓",
+};
+
+/** 판정 결과를 화자 줄 옆에 짧게 붙인다. 어느 판정기였는지도 함께 보여준다. */
+function verdictBadge(v: JudgeVerdict): string {
+  const mark = TONE_MARK[v.tone] ?? "";
+  const who = v.source === "claude" ? "AI 판정" : "규칙 판정";
+  const sign = v.affinityDelta > 0 ? `+${v.affinityDelta}` : `${v.affinityDelta}`;
+  return `[ ${who} · ${mark} ${sign} ]`;
+}
 
 export class DialogueScene extends Phaser.Scene {
   private dialogueData!: DialogueSceneData;
@@ -64,6 +88,7 @@ export class DialogueScene extends Phaser.Scene {
   // --- 대화 로그 ---
   private history: { speaker: string; line: string }[] = [];
   private lastLogged = "";
+  private lastVerdict: JudgeVerdict | null = null;
   private logOpen = false;
   private logObjects: Phaser.GameObjects.GameObject[] = [];
 
@@ -79,6 +104,9 @@ export class DialogueScene extends Phaser.Scene {
    * 직접 계산해 body에 붙이고 크기 변화마다 다시 맞춘다.
    */
   private inputEl?: HTMLInputElement;
+  /** 자유 입력 판정기. 설정에 따라 오프라인이거나 언어모델이다. */
+  private judge!: DialogueJudge;
+  private judging = false;
   private inputLayout?: { x: number; y: number; w: number; h: number };
   private repositionInput = () => this.applyInputLayout();
 
@@ -94,6 +122,8 @@ export class DialogueScene extends Phaser.Scene {
     this.lastLogged = "";
     this.logOpen = false;
     this.typing = false;
+    this.judging = false;
+    this.judge = createJudge();
   }
 
   create() {
@@ -360,7 +390,11 @@ export class DialogueScene extends Phaser.Scene {
     const node = getNode(this.dialogueData.tree, this.currentNodeId);
     if (node.flagOnEnter) this.dialogueData.onFlag?.(node.flagOnEnter);
 
-    this.speakerText.setText(node.speaker.toUpperCase());
+    this.speakerText.setText(
+      this.lastVerdict
+        ? `${node.speaker.toUpperCase()}   ${verdictBadge(this.lastVerdict)}`
+        : node.speaker.toUpperCase()
+    );
 
     if (node.menace) {
       this.panel.setFillStyle(0x160a0c, 1).setStrokeStyle(1, 0x7c1f2b);
@@ -504,7 +538,8 @@ export class DialogueScene extends Phaser.Scene {
       .setInteractive({ useHandCursor: true });
     this.optionObjects.push(submitBtn);
 
-    const submit = () => {
+    const submit = async () => {
+      if (this.judging) return;
       const value = inputEl.value.trim();
       if (!value) {
         // 예전에는 조용히 무시해서 버튼이 고장난 것처럼 보였다.
@@ -513,18 +548,48 @@ export class DialogueScene extends Phaser.Scene {
         inputEl.focus();
         return;
       }
-      const result = evaluateFreeText(value, node);
+
+      // 언어모델 판정은 왕복이 걸린다. 그동안 두 번 보내지 못하게 잠그고 상태를 보여준다.
+      this.judging = true;
+      inputEl.disabled = true;
+      submitBtn.setText("[ 판정 중… ]");
       this.history.push({ speaker: "(나)", line: value });
-      if (result.lethal) return this.triggerLethal(result.lethal);
-      if (result.trustDelta)
-        this.dialogueData.onTrustDelta(this.dialogueData.tree.npcId, result.trustDelta);
-      if (result.flag) this.dialogueData.onFlag?.(result.flag);
-      this.goTo(result.next);
+
+      let verdict: JudgeVerdict;
+      try {
+        verdict = await this.judge.judge({
+          playerLine: value,
+          node,
+          persona: personaOf(this.dialogueData.tree.npcId),
+          affinity: this.dialogueData.affinity ?? 0,
+          history: this.history,
+        });
+      } finally {
+        this.judging = false;
+      }
+
+      // 판정이 도는 사이에 창이 닫혔을 수 있다.
+      if (this.closed || !this.scene.isActive()) return;
+
+      this.lastVerdict = verdict;
+      if (verdict.reason) {
+        this.history.push({ speaker: "(판정)", line: verdict.reason });
+      }
+      if (verdict.lethal) return this.triggerLethal(verdict.lethal);
+
+      if (verdict.affinityDelta) {
+        const note = this.dialogueData.onAffinity?.(
+          this.dialogueData.tree.npcId,
+          verdict.affinityDelta
+        );
+        if (note) this.history.push({ speaker: "(관계)", line: note });
+      }
+      this.goTo(verdict.next);
     };
 
-    submitBtn.on("pointerdown", submit);
+    submitBtn.on("pointerdown", () => void submit());
     inputEl.addEventListener("keydown", (e) => {
-      if (e.key === "Enter") submit();
+      if (e.key === "Enter") void submit();
     });
 
     this.time.delayedCall(50, () => inputEl.focus());

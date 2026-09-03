@@ -4,7 +4,6 @@ import { getState, setState, gameEvents, flushSave, markNearSavePoint } from "..
 import {
   applyDeath,
   advanceSavePoint,
-  adjustTrust,
   addStoryFlag,
   grantAchievement,
   collectPickup,
@@ -24,6 +23,7 @@ import { PLAYER_BASE } from "../data/combat/balance";
 import { COMPASS_FLAG, relicModifiers, revealsDialogueDanger } from "../systems/EffectRegistry";
 import { paintScenery, type SceneryStyle } from "../render/scenery";
 import { PLATFORMING } from "../systems/Platforming";
+import { adjustAffinity, affinityOf, STAGE_LABEL } from "../systems/AffinitySystem";
 import { CONSUMABLE_POOL } from "../data/items/consumables";
 import { drawVolumetricCharacter, addIdleFloat } from "../render/volumetric";
 
@@ -201,8 +201,7 @@ export class RegionScene extends Phaser.Scene {
       }
     }
 
-    if (this.config.sideExit) {
-      const se = this.config.sideExit;
+    for (const se of this.config.sideExits ?? []) {
       const sideExitObj = this.add.rectangle(se.x, se.y, 160, 30, 0x8fbfa4, 0.15);
       this.physics.add.existing(sideExitObj, true);
       this.add.text(se.x, se.y - 20, se.label, { fontSize: "11px", color: "#8fbfa4" }).setOrigin(0.5);
@@ -239,7 +238,7 @@ export class RegionScene extends Phaser.Scene {
           if (this.enteringRift) return;
           this.enteringRift = true;
           flushSave();
-          this.scene.start("RiftScene");
+          this.scene.start("RiftScene", { riftId: re.riftId });
         },
       });
     }
@@ -574,6 +573,34 @@ export class RegionScene extends Phaser.Scene {
    * 대화가 남기는 플래그 처리. 대부분은 그대로 기록하지만,
    * 서약 역류처럼 상태를 크게 건드리는 것은 여기서 따로 해석한다.
    */
+  /**
+   * 호감도를 움직이고, 관계 단계가 바뀌었으면 알린다.
+   * 유물의 신뢰 배율은 오르는 쪽에만 걸린다 — 감정을 상하게 한 것까지 완화해 주지는 않는다.
+   */
+  private applyAffinity(npcId: string, delta: number): string | null {
+    const mult = relicModifiers(getState().equippedRelics).trustMultiplier;
+    const scaled = delta > 0 ? Math.round(delta * mult) : delta;
+    const change = adjustAffinity(getState(), npcId, scaled);
+    setState(change.state);
+
+    if (change.locked === "ally") {
+      const label = `${npcId} — 동료가 되었다`;
+      gameEvents.emit("achievement-earned", { label });
+      return label;
+    }
+    if (change.locked === "hostile") {
+      const label = `${npcId} — 적대 관계가 되었다`;
+      gameEvents.emit("achievement-earned", { label });
+      return label;
+    }
+    if (change.stageAfter !== change.stageBefore) {
+      const label = `관계: ${STAGE_LABEL[change.stageBefore]} → ${STAGE_LABEL[change.stageAfter]}`;
+      gameEvents.emit("achievement-earned", { label });
+      return label;
+    }
+    return null;
+  }
+
   private handleDialogueFlag(flag: string) {
     const state = getState();
 
@@ -623,12 +650,9 @@ export class RegionScene extends Phaser.Scene {
 
     const data: DialogueSceneData = {
       tree: npc.dialogue,
-      onTrustDelta: (npcId, delta) => {
-        // 「침묵의 인장 조각」 같은 유물이 신뢰 획득을 키운다. 감소는 그대로 둔다.
-        const mult = relicModifiers(getState().equippedRelics).trustMultiplier;
-        const scaled = delta > 0 ? Math.round(delta * mult) : delta;
-        setState(adjustTrust(getState(), npcId, scaled));
-      },
+      onTrustDelta: (npcId, delta) => this.applyAffinity(npcId, delta),
+      affinity: affinityOf(getState(), npc.id),
+      onAffinity: (npcId, delta) => this.applyAffinity(npcId, delta),
       onFlag: (flag) => this.handleDialogueFlag(flag),
       // 「거짓말 탐지 부표」를 지녔다면 위험한 갈래가 표시된다.
       revealDanger: revealsDialogueDanger(getState().inventory.consumables),
