@@ -214,6 +214,8 @@ export const REGIONS: Record<string, RegionConfig> = {
     sideExits: [
       { x: 120, y: 550, toRegionKey: "ash-market", label: "재의 시장으로 돌아가기" },
       { x: 860, y: 550, toRegionKey: "boundary-gate", label: "곁길: 경계문 앞" },
+      { x: 480, y: 560, toRegionKey: "sunken-belfry", label: "곁길: 가라앉은 종루" },
+      { x: 300, y: 70, toRegionKey: "salt-store", label: "소금 창고" },
     ],
     riftEntrance: {
       x: 520,
@@ -317,6 +319,66 @@ export const REGIONS: Record<string, RegionConfig> = {
     ],
     npcs: [],
     sideExits: [{ x: 60, y: 420, toRegionKey: "residue-district", label: "잔재구로 돌아가기" }],
+  },
+
+  // 가라앉은 종루 — 정박지에서 이어지는 조용한 곁가지. 두 번째 균열의 다른 입구.
+  "sunken-belfry": {
+    key: "sunken-belfry",
+    title: "가라앉은 종루",
+    backgroundColor: 0x142833,
+    movementMode: "topdown",
+    playerStart: { x: 80, y: 300 },
+    pickups: [
+      { id: "belfry-rope-1", x: 420, y: 170, fragmentReward: 20 },
+      { id: "belfry-rope-2", x: 760, y: 440, fragmentReward: 26 },
+    ],
+    npcs: [],
+    sideExits: [
+      { x: 100, y: 550, toRegionKey: "anchorage", label: "정박지로 돌아가기" },
+      { x: 860, y: 550, toRegionKey: "shallow-ford", label: "곁길: 얕은 여울" },
+    ],
+    riftEntrance: {
+      x: 480,
+      y: 300,
+      label: "균열: 잠긴 정박지 (종루 아래)",
+      riftId: "sunken-anchorage",
+    },
+  },
+
+  // 소금 창고 — 유일하게 밝고 안전한 실내. 환로와 소금 관리인의 일터.
+  "salt-store": {
+    key: "salt-store",
+    title: "소금 창고",
+    backgroundColor: 0x33332c,
+    movementMode: "topdown",
+    playerStart: { x: 80, y: 300 },
+    pickups: [{ id: "salt-store-shelf", x: 700, y: 200, fragmentReward: 15 }],
+    npcs: [],
+    sideExits: [{ x: 100, y: 550, toRegionKey: "anchorage", label: "정박지로 나가기" }],
+    exchangePost: { x: 480, y: 240, label: "환로 (창고)" },
+  },
+
+  // 얕은 여울 — 발목까지 오는 물길. 함정은 눈에 보이는데 바닥이 안 보인다.
+  "shallow-ford": {
+    key: "shallow-ford",
+    title: "얕은 여울",
+    backgroundColor: 0x1c3a2a,
+    movementMode: "sidescroll",
+    worldWidth: 2300,
+    groundY: 420,
+    playerStart: { x: 70, y: 380 },
+    // 크기는 Platforming.hazardClearance가 검증한다 — 여유 1.4배 미만이면 테스트가 실패한다.
+    hazard: { x: 1200, y: 420, w: 48, h: 86, label: "깊어지는 자리 — 점프로 넘으세요" },
+    platforms: [
+      { x: 600, y: 335, w: 130, h: 16 },
+      { x: 1650, y: 325, w: 130, h: 16 },
+    ],
+    pickups: [
+      { id: "ford-stone-1", x: 600, y: 305, fragmentReward: 16 },
+      { id: "ford-stone-2", x: 1650, y: 295, fragmentReward: 22 },
+    ],
+    npcs: [],
+    sideExits: [{ x: 60, y: 420, toRegionKey: "sunken-belfry", label: "종루로 돌아가기" }],
   },
 };
 
