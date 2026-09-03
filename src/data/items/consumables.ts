@@ -57,4 +57,27 @@ export const CONSUMABLE_POOL: ConsumableItem[] = [
 
   // --- SSR ---
   { id: "morens-blank-page", name: "모른의 백지", rarity: "SSR", flavor: "아무것도 적혀 있지 않은 것이 이 장의 내용이다.", effect: "얼룩과 범람을 지우고 보호막과 완전한 예지를 얻는다." },
+
+  // === 3차 배치 =============================================================
+  // --- C ---
+  { id: "ash-scrapings", name: "재 부스러기", rarity: "C", flavor: "쓸어 담으면 한 줌은 나온다.", effect: "여진 가루를 조금 얻는다." },
+  { id: "river-salt-packet", name: "강소금 한 봉", rarity: "C", flavor: "물가 사람들이 늘 품고 다니는 것.", effect: "얼룩을 씻어낸다." },
+  { id: "tallow-nub", name: "양초 토막", rarity: "C", flavor: "심지가 짧아 오래는 못 간다.", effect: "잠깐 앞이 보이고, 옅은 보호막이 생긴다." },
+  { id: "bent-nail", name: "휜 못", rarity: "C", flavor: "판자에서 뽑아낸 것. 아직 쓸 만하다.", effect: "적에게 약간의 고정 피해를 준다." },
+
+  // --- UC ---
+  { id: "listeners-wax", name: "듣는 밀랍", rarity: "UC", flavor: "귀가 아니라 말에 바르는 밀랍이다.", effect: "지니고 있으면 대화에서 치명적인 선택지가 드러난다." },
+  { id: "spare-breath", name: "여분의 숨", rarity: "UC", flavor: "누군가 쉬지 못한 숨이 담겨 있다.", effect: "체력을 회복하고 보호막을 두른다." },
+  { id: "mudlarks-hook", name: "갯벌 갈고리", rarity: "UC", flavor: "바닥을 긁어 무언가를 건져 올리는 물건.", effect: "균열에서 앞의 방 세 개를 드러낸다." },
+
+  // --- R ---
+  { id: "unsent-letter", name: "부치지 못한 편지", rarity: "R", flavor: "받는 사람이 이미 없다는 걸 쓰는 도중에 알았다.", effect: "파편을 얻는다." },
+  { id: "second-hand-name", name: "얻어 쓴 이름", rarity: "R", flavor: "주인이 더는 쓰지 않겠다고 한 이름.", effect: "표식을 지우고 두꺼운 보호막을 두른다." },
+
+  // --- SR ---
+  { id: "stitchers-needle", name: "꿰매는 바늘", rarity: "SR", flavor: "벌어진 것을 닫는 데 쓴다. 입이든 상처든.", effect: "범람을 멎게 하고 체력을 크게 회복한다." },
+  { id: "counted-breath", name: "세어 둔 숨", rarity: "SR", flavor: "하나, 둘, 셋. 세어 둔 만큼만 쓸 수 있다.", effect: "반격당하지 않는 행동을 세 번 얻는다." },
+
+  // --- SSR ---
+  { id: "unspoken-answer", name: "하지 않은 대답", rarity: "SSR", flavor: "끝내 입 밖에 내지 않은 말이 가장 오래 남는다.", effect: "얼룩을 지우고, 완전한 예지와 먼저 움직일 기회를 얻는다." },
 ];

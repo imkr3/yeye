@@ -102,9 +102,19 @@ check("가까이 가도 저절로 열리지 않는다", (await dlg()) === null);
 
 await page.keyboard.press("KeyE");
 await page.waitForTimeout(450);
+const midTyping = await page.evaluate(`${G}.scene.getScene("DialogueScene").typing`);
+await page.keyboard.press("KeyX"); // 타자 연출 건너뛰기
+await page.waitForTimeout(300);
 const opened = await dlg();
 check("E를 누르면 대화가 열린다", opened !== null, JSON.stringify(await scenes()));
 check("지역 씬은 일시정지된다", !(await scenes()).includes("RegionScene"));
+check("대사가 타자 연출로 나온다", midTyping === true);
+check("아무 키나 누르면 즉시 표시된다", (await page.evaluate(`${G}.scene.getScene("DialogueScene").typing`)) === false);
+// 대화 중에는 아래 상태창 버튼이 눌리면 안 된다.
+check(
+  "대화 중 상태창 입력이 꺼진다",
+  (await page.evaluate(`${G}.scene.getScene("StatusOverlayScene").input.enabled`)) === false
+);
 
 console.log("\n2. 선택지 버튼이 실제 마우스 클릭에 반응한다");
 const n0 = (await dlg())?.node;
@@ -117,7 +127,45 @@ await page.evaluate(`(() => {
   const d = ${G}.scene.getScene("DialogueScene");
   d.currentNodeId = "ask-feeling"; d.renderNode();
 })()`);
-await page.waitForTimeout(400);
+await page.waitForTimeout(300);
+await page.evaluate(`${G}.scene.getScene("DialogueScene").finishTyping()`);
+await page.waitForTimeout(300);
+
+// 예전에는 입력창과 [전달] 버튼이 겹쳐 있었다. 실제 좌표로 확인한다.
+// 페이지 좌표로 통일해서 비교한다 (클릭에 쓰는 변환과 같은 식).
+const geom = await page.evaluate(`(() => {
+  const g = ${G};
+  const d = g.scene.getScene("DialogueScene");
+  const input = document.querySelector('input[type="text"]');
+  const btn = (d.optionObjects||[]).find(o => o.type === "Text");
+  if (!input || !btn) return null;
+  const cv = g.canvas.getBoundingClientRect();
+  const s = g.scale.displayScale;
+  const el = input.getBoundingClientRect();
+  const toPageY = (gameY) => cv.top + gameY / s.y;
+  return {
+    canvasLeftPage: cv.left, inputLeftPage: el.left,
+    inputTopPage: el.top, inputBottomPage: el.bottom,
+    buttonTopPage: toPageY(btn.y), buttonBottomPage: toPageY(btn.y + btn.height),
+    panelBottomPage: toPageY(310 + 270),
+  };
+})()`);
+check(
+  "입력창과 전달 버튼이 겹치지 않는다",
+  !!geom && geom.buttonTopPage >= geom.inputBottomPage - 1,
+  JSON.stringify(geom)
+);
+check(
+  "전달 버튼이 패널 안에 들어온다",
+  !!geom && geom.buttonBottomPage < geom.panelBottomPage,
+  JSON.stringify(geom)
+);
+// 캔버스가 레터박스로 가운데 정렬돼도 입력창이 제자리에 있어야 한다.
+check(
+  "입력창이 캔버스 기준으로 정렬된다",
+  !!geom && geom.inputLeftPage > geom.canvasLeftPage,
+  JSON.stringify(geom)
+);
 
 const box = await page.evaluate(`(() => {
   const el = document.querySelector('input[type="text"]');
@@ -143,7 +191,35 @@ await clickFirstOption(); // [ 전달 ]
 const afterSubmit = (await dlg())?.node;
 check("전달을 누르면 대화가 진행된다", afterSubmit !== beforeSubmit, `${beforeSubmit} -> ${afterSubmit}`);
 
-console.log("\n4. 빠져나오기와 다시 열기");
+console.log("\n4. 대화 편의 기능 — 숫자키 선택과 기록");
+// 선택지가 여러 개인 상대(무릎 꿇은 사람)로 확인한다.
+await page.keyboard.press("Escape");
+await page.waitForTimeout(400);
+await approach(1);
+await page.keyboard.press("KeyE");
+await page.waitForTimeout(450);
+await page.keyboard.press("KeyX");
+await page.waitForTimeout(300);
+const multi = await dlg();
+check("선택지가 여러 개인 노드가 열린다", (multi?.options ?? 0) >= 2, JSON.stringify(multi));
+
+const beforeNum = multi?.node;
+await page.keyboard.press("Digit2");
+await page.waitForTimeout(400);
+check("숫자키로 선택지를 고를 수 있다", (await dlg())?.node !== beforeNum, `${beforeNum} -> ${(await dlg())?.node}`);
+
+await page.keyboard.press("KeyX");
+await page.waitForTimeout(250);
+await page.keyboard.press("KeyL");
+await page.waitForTimeout(350);
+check("L로 대화 기록이 열린다", (await page.evaluate(`${G}.scene.getScene("DialogueScene").logOpen`)) === true);
+const logged = await page.evaluate(`${G}.scene.getScene("DialogueScene").history.length`);
+check("기록에 지나간 대사가 쌓인다", logged >= 2, `${logged}줄`);
+await page.keyboard.press("KeyL");
+await page.waitForTimeout(300);
+check("다시 L을 누르면 닫힌다", (await page.evaluate(`${G}.scene.getScene("DialogueScene").logOpen`)) === false);
+
+console.log("\n5. 빠져나오기와 다시 열기");
 await page.keyboard.press("Escape");
 await page.waitForTimeout(400);
 check("Esc로 대화를 닫을 수 있다", (await dlg()) === null);
@@ -159,6 +235,12 @@ check("다시 E를 누르면 또 열린다", (await dlg()) !== null);
 
 const capsAfter = await page.evaluate(`${G}.input.keyboard.preventDefault`);
 check("대화를 닫은 뒤 키 캡처가 복구된다", capsAfter === true, String(capsAfter));
+await page.keyboard.press("Escape");
+await page.waitForTimeout(350);
+check(
+  "대화를 닫으면 상태창 입력이 되살아난다",
+  (await page.evaluate(`${G}.scene.getScene("StatusOverlayScene").input.enabled`)) === true
+);
 
 check("전 과정에서 페이지 오류가 없다", pageErrors.length === 0, pageErrors.join(" | "));
 

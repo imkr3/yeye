@@ -23,7 +23,6 @@ const config: Phaser.Types.Core.GameConfig = {
   pixelArt: false,
   antialias: true,
   roundPixels: false,
-  dom: { createContainer: true }, // 대화 자유 입력용 HTML <input> 사용
   scale: {
     mode: Phaser.Scale.FIT,
     autoCenter: Phaser.Scale.CENTER_BOTH,

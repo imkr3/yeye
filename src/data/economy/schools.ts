@@ -94,6 +94,34 @@ const ITEM_SCHOOLS: Record<string, School> = {
   "unstained-veil": "sanctity",
   "returned-favor-pin": "bond",
   "ledger-of-small-mercies": "sanctity",
+
+  // --- 3차 배치 · 소모품 ---
+  "ash-scrapings": "ruin",
+  "river-salt-packet": "life",
+  "tallow-nub": "sanctity",
+  "bent-nail": "ruin",
+  "listeners-wax": "bond",
+  "spare-breath": "life",
+  "mudlarks-hook": "bond",
+  "unsent-letter": "bond",
+  "second-hand-name": "ruin",
+  "stitchers-needle": "life",
+  "counted-breath": "sanctity",
+  "unspoken-answer": "sanctity",
+
+  // --- 3차 배치 · 유물 ---
+  "cracked-lens": "bond",
+  "leather-cord": "ruin",
+  "flat-stone": "life",
+  "salt-crusted-boots": "life",
+  "tin-charm": "sanctity",
+  "ledger-clip": "bond",
+  "pilgrims-thread": "sanctity",
+  "counters-abacus": "bond",
+  "hollow-name-tag": "bond",
+  "stitched-lips-charm": "sanctity",
+  "anchorage-stone": "life",
+  "the-unasked-question": "sanctity",
 };
 
 export function schoolOf(itemId: string): School {

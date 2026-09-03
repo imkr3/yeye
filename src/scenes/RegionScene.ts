@@ -21,7 +21,7 @@ import type { DialogueSceneData } from "./DialogueScene";
 import type { CombatSceneData } from "./CombatScene";
 import { RIFT_ENEMIES } from "../data/rifts/enemies";
 import { PLAYER_BASE } from "../data/combat/balance";
-import { COMPASS_FLAG, relicModifiers } from "../systems/EffectRegistry";
+import { COMPASS_FLAG, relicModifiers, revealsDialogueDanger } from "../systems/EffectRegistry";
 import { paintScenery, type SceneryStyle } from "../render/scenery";
 import { PLATFORMING } from "../systems/Platforming";
 import { CONSUMABLE_POOL } from "../data/items/consumables";
@@ -631,7 +631,7 @@ export class RegionScene extends Phaser.Scene {
       },
       onFlag: (flag) => this.handleDialogueFlag(flag),
       // 「거짓말 탐지 부표」를 지녔다면 위험한 갈래가 표시된다.
-      revealDanger: getState().inventory.consumables.includes("truth-buoy"),
+      revealDanger: revealsDialogueDanger(getState().inventory.consumables),
       onLethal: (reason) => {
         this.dialogueOpen = false;
         this.scene.resume();
@@ -647,5 +647,13 @@ export class RegionScene extends Phaser.Scene {
       },
     };
     this.scene.launch("DialogueScene", data);
+
+    // 안전장치: 어떤 이유로든 onClose를 거치지 않고 대화창이 닫혀도 지역이 멈춘 채로
+    // 남지 않게 한다. onClose가 먼저 플래그를 내리므로 이중 실행되지 않는다.
+    this.scene.get("DialogueScene").events.once("shutdown", () => {
+      if (!this.dialogueOpen) return;
+      this.dialogueOpen = false;
+      this.scene.resume();
+    });
   }
 }
